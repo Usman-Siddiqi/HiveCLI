@@ -15,41 +15,42 @@ export function AppLayout() {
   useAppBootstrap();
 
   return (
-    <div className="grid-background min-h-screen px-5 py-5">
-      <div className="mx-auto grid min-h-[calc(100vh-40px)] max-w-[1680px] grid-cols-[220px_1fr] gap-5">
-        <aside className="panel rounded-[30px] p-4">
-          <div className="mb-8">
-            <div className="text-xs uppercase tracking-[0.3em] text-[var(--accent)]">
-              HiveCLI
+    <div className="app-shell">
+      <div className="app-frame">
+        <aside className="app-sidebar">
+          <div className="app-sidebar-content">
+            <div className="border-b border-[var(--border)] pb-5">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">
+                HiveCLI
+              </div>
+              <h1 className="mt-3 text-[30px] font-semibold leading-none">Swarm Desk</h1>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+                Local operator workspace for parallel CLI and LLM runs.
+              </p>
             </div>
-            <h1 className="mt-2 text-3xl font-semibold leading-none">Swarm Desk</h1>
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              Multi-agent control room for terminal-backed developer workflows.
-            </p>
-          </div>
 
-          <nav className="space-y-2">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition",
-                    isActive
-                      ? "border-[var(--border-strong)] bg-[var(--accent)]/10 text-[var(--text)]"
-                      : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-white/5 hover:text-[var(--text)]",
-                  )
-                }
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
+            <nav className="mt-5 space-y-1.5">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn("shell-link", isActive && "shell-link-active")
+                  }
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="mt-auto border-t border-[var(--border)] pt-4 text-xs leading-5 text-[var(--muted)]">
+              Panels stay terminal-first, sessions are persisted locally, and shell access remains visible.
+            </div>
+          </div>
         </aside>
 
-        <main className="min-h-full">
+        <main className="app-main">
           <Outlet />
         </main>
       </div>

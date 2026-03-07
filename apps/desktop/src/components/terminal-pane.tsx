@@ -18,9 +18,9 @@ export function TerminalPane({ output }: { output: string }) {
       fontFamily: "IBM Plex Mono, Consolas, monospace",
       fontSize: 12,
       theme: {
-        background: "#09111d",
-        foreground: "#eff5ff",
-        cursor: "#7cf5cb",
+        background: "#0f0e0c",
+        foreground: "#ede4d8",
+        cursor: "#c48b3b",
       },
     });
     const fitAddon = new FitAddon();
@@ -60,5 +60,12 @@ export function TerminalPane({ output }: { output: string }) {
     }
   }, [output]);
 
-  return <div ref={containerRef} className="h-[260px] w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[#09111d]" />;
+  return (
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)]">
+      <div className="border-b border-[var(--border)] px-4 py-2 text-xs font-medium text-[var(--muted)]">
+        Live transcript
+      </div>
+      <div ref={containerRef} className="h-[220px] w-full overflow-hidden bg-[#0f0e0c]" />
+    </section>
+  );
 }

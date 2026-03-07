@@ -3,17 +3,21 @@
 @tailwind utilities;
 
 :root {
-  --bg: #09111d;
-  --panel: rgba(11, 22, 38, 0.84);
-  --panel-strong: rgba(8, 17, 30, 0.96);
-  --border: rgba(117, 149, 196, 0.18);
-  --border-strong: rgba(124, 171, 255, 0.3);
-  --text: #eff5ff;
-  --muted: #93a7c5;
-  --accent: #7cf5cb;
-  --accent-secondary: #69b4ff;
-  --warning: #ffc978;
-  --shadow: 0 32px 96px rgba(0, 0, 0, 0.36);
+  --bg: #141210;
+  --bg-deep: #0f0d0c;
+  --surface: rgba(28, 25, 22, 0.94);
+  --surface-muted: rgba(23, 21, 19, 0.96);
+  --surface-strong: rgba(16, 14, 12, 0.98);
+  --border: rgba(92, 82, 72, 0.46);
+  --border-strong: rgba(149, 132, 114, 0.78);
+  --text: #ede4d8;
+  --muted: #9c9284;
+  --accent: #c48b3b;
+  --accent-soft: rgba(196, 139, 59, 0.18);
+  --accent-secondary: #7d9483;
+  --warning: #d0a15c;
+  --danger: #c06a58;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
 }
 
 * {
@@ -30,35 +34,132 @@ body,
 body {
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(105, 180, 255, 0.14), transparent 30%),
-    radial-gradient(circle at top right, rgba(124, 245, 203, 0.14), transparent 28%),
-    linear-gradient(180deg, #0a1220 0%, #04070d 100%);
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 160px),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.012) 0,
+      rgba(255, 255, 255, 0.012) 1px,
+      transparent 1px,
+      transparent 96px
+    ),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  font-family: "IBM Plex Sans", "Aptos", sans-serif;
+  letter-spacing: -0.01em;
 }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(18px);
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
-.grid-background {
-  position: relative;
+::selection {
+  background: rgba(196, 139, 59, 0.28);
 }
 
-.grid-background::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(124, 245, 203, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(105, 180, 255, 0.035) 1px, transparent 1px);
-  background-size: 32px 32px;
-  pointer-events: none;
-  mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent);
-}
+@layer components {
+  .app-shell {
+    @apply min-h-screen;
+  }
 
-.terminal-font {
-  font-family: "IBM Plex Mono", "Consolas", monospace;
+  .app-frame {
+    @apply grid min-h-screen grid-cols-[248px_1fr];
+  }
+
+  .app-sidebar {
+    background: rgba(18, 16, 14, 0.98);
+    border-right: 1px solid var(--border);
+  }
+
+  .app-sidebar-content {
+    @apply flex h-full flex-col px-5 py-6;
+  }
+
+  .app-main {
+    @apply min-h-screen px-8 py-7;
+  }
+
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+
+  .surface-muted {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+  }
+
+  .surface-strong {
+    background: var(--surface-strong);
+    border: 1px solid var(--border);
+  }
+
+  .section-title {
+    @apply text-base font-semibold tracking-[-0.01em];
+  }
+
+  .section-copy {
+    @apply text-sm leading-6;
+    color: var(--muted);
+  }
+
+  .meta-strip {
+    @apply flex flex-wrap items-center gap-2 text-xs;
+    color: var(--muted);
+  }
+
+  .meta-chip {
+    @apply inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .shell-link {
+    @apply flex items-center gap-3 px-3 py-2.5 text-sm transition;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+  }
+
+  .shell-link:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text);
+  }
+
+  .shell-link-active {
+    border-left-color: var(--accent);
+    background: rgba(196, 139, 59, 0.1);
+    color: var(--text);
+  }
+
+  .panel-list-button {
+    @apply w-full rounded-lg px-3 py-3 text-left transition;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .panel-list-button:hover {
+    border-color: var(--border-strong);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .panel-list-button-active {
+    border-color: var(--border-strong);
+    background: rgba(196, 139, 59, 0.08);
+  }
+
+  .subtle-rule {
+    border-top: 1px solid var(--border);
+  }
+
+  .terminal-font {
+    font-family: "IBM Plex Mono", "Consolas", monospace;
+  }
 }

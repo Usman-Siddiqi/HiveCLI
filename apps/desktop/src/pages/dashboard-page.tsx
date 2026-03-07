@@ -25,7 +25,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="grid h-full gap-5 xl:grid-cols-[340px_1fr]">
+    <div className="grid h-full gap-6 xl:grid-cols-[340px_1fr]">
       <div className="space-y-5">
         <WorkspaceSidebar
           workspaces={workspaces}
@@ -42,41 +42,93 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="panel rounded-[32px] p-6">
-        <div className="max-w-3xl">
-          <div className="text-xs uppercase tracking-[0.3em] text-[var(--accent)]">MVP Status</div>
-          <h2 className="mt-3 text-4xl font-semibold">
-            Broadcast prompts across several terminal-backed agents from one desktop workspace.
-          </h2>
-          <p className="mt-4 text-base leading-7 text-[var(--muted)]">
-            Create a directory-backed workspace, attach Codex CLI or Gemini CLI agents, stream their
-            output in parallel, and reopen prior sessions without losing the event timeline.
+      <section className="space-y-6">
+        <header className="surface rounded-xl px-6 py-5">
+          <h2 className="text-[32px] font-semibold tracking-[-0.03em]">Workspace dashboard</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">
+            HiveCLI keeps multi-agent runs visible, replayable, and local. Start with one workspace,
+            attach a small roster of CLI agents, then compare raw outputs against a final council
+            synthesis before you decide what to keep.
           </p>
+          <div className="meta-strip mt-4">
+            <span className="meta-chip">{workspaces.length} workspaces</span>
+            <span className="meta-chip">{sessions.length} stored sessions</span>
+            <span className="meta-chip">Terminal-first adapters</span>
+          </div>
+        </header>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {[
-              ["Parallel agents", "Run 2 to 4 terminal agents in the same session."],
-              ["Council mode", "Auto-run a judge after all selected agents finish."],
-              ["Replayable history", "Persist sessions, runs, events, and final output."],
-            ].map(([title, copy]) => (
-              <div key={title} className="rounded-[24px] border border-[var(--border)] bg-black/10 p-4">
-                <div className="text-sm font-medium">{title}</div>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{copy}</p>
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <section className="surface rounded-xl p-5">
+            <h3 className="section-title">Current operating model</h3>
+            <div className="subtle-rule mt-4" />
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {[
+                [
+                  "Broadcast once",
+                  "Send one prompt to several agents and compare their transcripts side by side.",
+                ],
+                [
+                  "Judge later",
+                  "Run council mode when you want one agent to synthesize the field after the rest finish.",
+                ],
+                [
+                  "Keep the transcript",
+                  "Persist task events, final text, and run metadata for replay and audit.",
+                ],
+                [
+                  "Stay local",
+                  "Commands, workspaces, and provider settings remain visible inside one desktop workspace.",
+                ],
+              ].map(([title, copy]) => (
+                <article
+                  key={title}
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-4"
+                >
+                  <h4 className="text-sm font-medium">{title}</h4>
+                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{copy}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="surface rounded-xl p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="section-title">Operator checklist</h3>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Use this flow to validate the MVP quickly.
+                </p>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-8">
-            <Button onClick={() => navigate("/swarm")}>Open Swarm View</Button>
-          </div>
+              <Button onClick={() => navigate("/swarm")}>Open swarm view</Button>
+            </div>
+            <ol className="mt-5 space-y-3">
+              {[
+                "Create a workspace mapped to the local project directory.",
+                "Add 2 to 4 agents, including one judge-capable agent if you want council mode.",
+                "Run a broadcast prompt and inspect each transcript independently.",
+                "Switch to council mode to trigger a final synthesis after all selected agents settle.",
+                "Reopen the saved session later from the history view.",
+              ].map((item, index) => (
+                <li
+                  key={item}
+                  className="grid grid-cols-[28px_1fr] gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-3"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--accent-soft)] text-sm font-semibold text-[var(--accent)]">
+                    {index + 1}
+                  </span>
+                  <span className="text-sm leading-6 text-[var(--text)]">{item}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
         </div>
-      </div>
+      </section>
 
       <Modal
         open={open}
         onOpenChange={setOpen}
-        title="Create Workspace"
-        description="Each workspace maps to one local root directory. Agents inherit this root as their default working directory."
+        title="Create workspace"
+        description="Each workspace maps to one local root directory. New agents inherit that root as their default working directory."
       >
         <div className="space-y-4">
           <label className="text-sm">
@@ -85,7 +137,11 @@ export function DashboardPage() {
           </label>
           <label className="text-sm">
             <div className="mb-2 text-[var(--muted)]">Root path</div>
-            <Input value={rootPath} onChange={(event) => setRootPath(event.target.value)} placeholder="C:\\Users\\you\\Code\\project" />
+            <Input
+              value={rootPath}
+              onChange={(event) => setRootPath(event.target.value)}
+              placeholder="C:\\Users\\you\\Code\\project"
+            />
           </label>
         </div>
         <div className="mt-6 flex justify-end gap-3">
@@ -93,7 +149,7 @@ export function DashboardPage() {
             Cancel
           </Button>
           <Button onClick={handleCreate} disabled={!name.trim() || !rootPath.trim()}>
-            Create
+            Create workspace
           </Button>
         </div>
       </Modal>

@@ -21,37 +21,45 @@ export function AgentPanel({
   onToggle: () => void;
 }) {
   return (
-    <section className={`panel rounded-[28px] p-4 transition ${selected ? "border-[var(--border-strong)]" : ""}`}>
-      <div className="mb-4 flex items-start justify-between gap-3">
+    <section className={`surface rounded-xl p-4 transition-colors ${selected ? "border-[color:var(--accent)]" : ""}`}>
+      <div className="mb-4 flex items-start justify-between gap-4 border-b border-[var(--border)] pb-4">
         <div>
           <div className="flex items-center gap-2">
             <button
               onClick={onToggle}
-              className={`rounded-full border px-3 py-1 text-xs uppercase tracking-[0.2em] transition ${
+              className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
                 selected
-                  ? "border-[var(--border-strong)] bg-[var(--accent)]/10 text-[var(--text)]"
-                  : "border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]"
+                  ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--text)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
               }`}
             >
-              {selected ? "Armed" : "Idle"}
+              {selected ? "Selected" : "Standby"}
             </button>
-            <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted)]">
+            <span className="meta-chip">
               {agent.provider}
             </span>
             {agent.shellAccess ? (
-              <span className="rounded-full border border-[color:rgba(255,201,120,0.24)] px-3 py-1 text-xs text-[var(--warning)]">
+              <span className="meta-chip text-[var(--warning)]">
                 Shell Access
               </span>
             ) : null}
           </div>
           <h3 className="mt-3 text-lg font-semibold">{agent.name}</h3>
-          <div className="mt-1 text-xs text-[var(--muted)]">
-            {agent.command} {(agent.args ?? []).join(" ")}
-          </div>
-          <div className="mt-1 text-xs text-[var(--muted)]">cwd: {agent.cwd ?? "workspace root"}</div>
+          <dl className="mt-3 grid gap-1 text-xs text-[var(--muted)]">
+            <div className="grid grid-cols-[84px_1fr] gap-3">
+              <dt>Command</dt>
+              <dd className="terminal-font text-[var(--text)]">
+                {agent.command} {(agent.args ?? []).join(" ")}
+              </dd>
+            </div>
+            <div className="grid grid-cols-[84px_1fr] gap-3">
+              <dt>Working dir</dt>
+              <dd>{agent.cwd ?? "workspace root"}</dd>
+            </div>
+          </dl>
         </div>
 
-        <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-2 text-right text-xs text-[var(--muted)]">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2 text-right text-xs text-[var(--muted)]">
           <div className="flex items-center justify-end gap-2">
             <Gauge className="h-4 w-4 text-[var(--accent)]" />
             {run?.status ?? "idle"}
@@ -60,22 +68,22 @@ export function AgentPanel({
         </div>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-2 text-xs text-[var(--muted)]">
-        <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-2">
+      <div className="mb-4 grid grid-cols-3 gap-3 text-xs text-[var(--muted)]">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2">
           <div className="flex items-center gap-2">
             <Bot className="h-4 w-4 text-[var(--accent-secondary)]" />
             Type
           </div>
           <div className="mt-2 text-[var(--text)]">{agent.type}</div>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-2">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2">
           <div className="flex items-center gap-2">
             <SquareTerminal className="h-4 w-4 text-[var(--accent)]" />
             Exit
           </div>
           <div className="mt-2 text-[var(--text)]">{run?.exitCode ?? "—"}</div>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-black/10 px-3 py-2">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-2">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-4 w-4 text-[var(--warning)]" />
             Judge

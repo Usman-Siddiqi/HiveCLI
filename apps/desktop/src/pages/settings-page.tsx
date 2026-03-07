@@ -25,19 +25,26 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="panel rounded-[32px] p-6">
+    <div className="surface rounded-xl p-6">
       <div className="max-w-3xl">
-        <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-secondary)]">Settings</div>
-        <h2 className="mt-2 text-3xl font-semibold">Local provider and workspace defaults</h2>
+        <h2 className="text-[30px] font-semibold tracking-[-0.03em]">
+          Local provider and workspace defaults
+        </h2>
         <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-          Secrets are stored locally and never streamed into the event log. CLI agents can also receive env vars directly from their config.
+          Secrets are stored locally and never streamed into the event log. CLI agents can also
+          receive environment variables directly from their config.
         </p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {settingKeys.map((key) => (
             <label key={key} className="text-sm">
               <div className="mb-2 text-[var(--muted)]">{key}</div>
-              <Input value={draft[key] ?? ""} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} />
+              <Input
+                value={draft[key] ?? ""}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, [key]: event.target.value }))
+                }
+              />
             </label>
           ))}
         </div>
@@ -46,10 +53,12 @@ export function SettingsPage() {
           <Button onClick={handleSave}>Save settings</Button>
         </div>
 
-        <div className="mt-10 rounded-[24px] border border-[var(--border)] bg-black/10 p-4">
+        <div className="mt-10 rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-4">
           <div className="text-sm font-medium">Stored keys</div>
           <div className="mt-3 text-sm text-[var(--muted)]">
-            {settings.length > 0 ? settings.map((setting) => setting.key).join(", ") : "No settings stored yet."}
+            {settings.length > 0
+              ? settings.map((setting) => setting.key).join(", ")
+              : "No settings stored yet."}
           </div>
         </div>
       </div>

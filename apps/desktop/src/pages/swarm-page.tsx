@@ -66,30 +66,32 @@ export function SwarmPage() {
 
   if (!workspaceDetail) {
     return (
-      <div className="panel flex min-h-[70vh] items-center justify-center rounded-[32px] p-6 text-[var(--muted)]">
+      <div className="surface flex min-h-[70vh] items-center justify-center rounded-xl p-6 text-[var(--muted)]">
         Create or open a workspace from the dashboard to start a swarm session.
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <TopToolbar
         workspaceDetail={workspaceDetail}
         connectionState={connectionState}
         onManageAgents={() => setModalOpen(true)}
       />
 
-      <div className="grid gap-5 xl:grid-cols-[280px_1fr_340px]">
+      <div className="grid gap-6 xl:grid-cols-[272px_1fr_320px]">
         <div className="space-y-5">
-          <div className="panel rounded-[28px] p-4">
-            <div className="mb-4 flex items-center justify-between">
+          <section className="surface rounded-xl p-4">
+            <div className="mb-4 flex items-center justify-between border-b border-[var(--border)] pb-3">
               <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-secondary)]">Agents</div>
-                <h2 className="mt-1 text-lg font-semibold">Workspace roster</h2>
+                <h2 className="section-title">Workspace roster</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Toggle the agents that should receive the next task.
+                </p>
               </div>
               <Button size="sm" onClick={() => setModalOpen(true)}>
-                <Plus className="mr-1 h-4 w-4" />
+                <Plus className="h-4 w-4" />
                 Add
               </Button>
             </div>
@@ -105,10 +107,8 @@ export function SwarmPage() {
                         : [...selectedAgentIds, agent.id],
                     )
                   }
-                  className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
-                    selectedAgentIds.includes(agent.id)
-                      ? "border-[var(--border-strong)] bg-[var(--accent)]/10"
-                      : "border-[var(--border)] bg-black/10 hover:border-[var(--border-strong)]"
+                  className={`panel-list-button ${
+                    selectedAgentIds.includes(agent.id) ? "panel-list-button-active" : ""
                   }`}
                 >
                   <div className="text-sm font-medium">{agent.name}</div>
@@ -118,7 +118,7 @@ export function SwarmPage() {
                 </button>
               ))}
             </div>
-          </div>
+          </section>
 
           <PromptComposer
             agents={workspaceDetail.agents}

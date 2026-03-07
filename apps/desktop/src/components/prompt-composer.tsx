@@ -39,21 +39,19 @@ export function PromptComposer({
   }
 
   return (
-    <div className="panel rounded-[28px] p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="surface rounded-xl p-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-secondary)]">
-            Prompt Composer
-          </div>
-          <h2 className="mt-1 text-lg font-semibold">Broadcast or run council synthesis</h2>
+          <h2 className="section-title">Prompt composer</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Dispatch one task across the selected agents.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="inline-flex rounded-md border border-[var(--border)] bg-[var(--surface-strong)] p-1">
           <button
             onClick={() => setMode("broadcast")}
-            className={`rounded-full border px-4 py-2 text-sm transition ${
+            className={`rounded-sm px-3 py-2 text-sm transition-colors ${
               mode === "broadcast"
-                ? "border-[var(--border-strong)] bg-[var(--accent-secondary)]/10"
-                : "border-[var(--border)] text-[var(--muted)]"
+                ? "bg-[var(--accent-soft)] text-[var(--text)]"
+                : "text-[var(--muted)]"
             }`}
           >
             <Users className="mr-2 inline h-4 w-4" />
@@ -61,10 +59,10 @@ export function PromptComposer({
           </button>
           <button
             onClick={() => setMode("council")}
-            className={`rounded-full border px-4 py-2 text-sm transition ${
+            className={`rounded-sm px-3 py-2 text-sm transition-colors ${
               mode === "council"
-                ? "border-[var(--border-strong)] bg-[var(--accent)]/10"
-                : "border-[var(--border)] text-[var(--muted)]"
+                ? "bg-[var(--accent-soft)] text-[var(--text)]"
+                : "text-[var(--muted)]"
             }`}
           >
             <Sparkles className="mr-2 inline h-4 w-4" />
@@ -83,7 +81,7 @@ export function PromptComposer({
         <div className="text-sm text-[var(--muted)]">Sending to {selectedAgentIds.length} agents</div>
         {mode === "council" ? (
           <select
-            className="rounded-full border border-[var(--border)] bg-black/10 px-4 py-2 text-sm text-[var(--text)]"
+            className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
             value={judgeAgentId ?? ""}
             onChange={(event) => onJudgeChange(event.target.value || null)}
           >
@@ -96,10 +94,10 @@ export function PromptComposer({
           </select>
         ) : null}
         <Button onClick={handleSubmit} disabled={submitting || !prompt.trim()}>
-          <Send className="mr-2 h-4 w-4" />
+          <Send className="h-4 w-4" />
           {submitting ? "Dispatching..." : "Run Task"}
         </Button>
       </div>
-    </div>
+    </section>
   );
 }

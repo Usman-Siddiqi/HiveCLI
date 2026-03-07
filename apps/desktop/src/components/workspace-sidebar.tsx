@@ -17,16 +17,14 @@ export function WorkspaceSidebar({
   onCreate: () => void;
 }) {
   return (
-    <div className="panel rounded-[28px] p-4">
-      <div className="mb-4 flex items-center justify-between">
+    <section className="surface rounded-xl p-4">
+      <div className="mb-4 flex items-center justify-between border-b border-[var(--border)] pb-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent-secondary)]">
-            Workspaces
-          </div>
-          <h2 className="mt-1 text-lg font-semibold">Active Projects</h2>
+          <h2 className="section-title">Workspaces</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Directory-backed projects and roots.</p>
         </div>
         <Button size="sm" onClick={onCreate}>
-          <Plus className="mr-1 h-4 w-4" />
+          <Plus className="h-4 w-4" />
           New
         </Button>
       </div>
@@ -37,14 +35,14 @@ export function WorkspaceSidebar({
             key={workspace.id}
             onClick={() => onSelect(workspace.id)}
             className={cn(
-              "w-full rounded-2xl border px-3 py-3 text-left transition",
+              "panel-list-button",
               workspace.id === activeWorkspaceId
-                ? "border-[var(--border-strong)] bg-[var(--accent-secondary)]/10"
-                : "border-[var(--border)] bg-black/10 hover:border-[var(--border-strong)] hover:bg-white/4",
+                ? "panel-list-button-active"
+                : "",
             )}
           >
             <div className="flex items-center gap-2 text-sm font-medium">
-              <FolderRoot className="h-4 w-4 text-[var(--accent)]" />
+              <FolderRoot className="h-4 w-4 text-[var(--accent-secondary)]" />
               {workspace.name}
             </div>
             <div className="mt-1 text-xs text-[var(--muted)]">
@@ -53,6 +51,6 @@ export function WorkspaceSidebar({
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -88,14 +88,14 @@ export function AgentConfigModal({
     <Modal
       open={open}
       onOpenChange={onOpenChange}
-      title={existingAgent ? "Edit Agent" : "Create Agent"}
+      title={existingAgent ? "Edit agent" : "Create agent"}
       description="CLI-backed agents run as trusted local processes. Commands and working directories stay visible in the UI."
     >
       <div className="grid gap-4 md:grid-cols-2">
         <label className="text-sm">
           <div className="mb-2 text-[var(--muted)]">Template</div>
           <select
-            className="h-11 w-full rounded-2xl border border-[var(--border)] bg-black/10 px-4 text-sm"
+            className="h-10 w-full rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
             value={templateId}
             onChange={(event) => handleTemplateChange(event.target.value)}
           >
@@ -131,7 +131,7 @@ export function AgentConfigModal({
           <textarea
             value={env}
             onChange={(event) => setEnv(event.target.value)}
-            className="min-h-[120px] w-full rounded-2xl border border-[var(--border)] bg-black/10 px-4 py-3"
+            className="min-h-[120px] w-full rounded-md border border-[var(--border)] bg-[var(--surface-strong)] px-3 py-3 text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
             placeholder="OPENAI_API_KEY=..."
           />
         </label>
@@ -152,7 +152,7 @@ export function AgentConfigModal({
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button onClick={handleSave}>Save Agent</Button>
+        <Button onClick={handleSave}>Save agent</Button>
       </div>
     </Modal>
   );

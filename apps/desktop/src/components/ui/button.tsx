@@ -4,18 +4,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-4 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-secondary)] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "border-[var(--border-strong)] bg-[var(--accent)]/12 text-[var(--text)] hover:bg-[var(--accent)]/18",
+          "border-[var(--accent)] bg-[var(--accent)] text-[#17120b] hover:bg-[#d59843]",
         secondary:
-          "border-[var(--border)] bg-white/4 text-[var(--text)] hover:bg-white/8",
+          "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[rgba(255,255,255,0.04)]",
         ghost:
-          "border-transparent bg-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-white/6 hover:text-[var(--text)]",
+          "border-transparent bg-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text)]",
         danger:
-          "border-[color:rgba(255,122,144,0.32)] bg-[color:rgba(255,122,144,0.12)] text-[var(--text)] hover:bg-[color:rgba(255,122,144,0.16)]",
+          "border-[var(--danger)] bg-[var(--danger)] text-[#180d0a] hover:bg-[#cd7664]",
       },
       size: {
         default: "h-10",

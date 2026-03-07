@@ -14,10 +14,10 @@ export function SessionList({
   onOpen: (sessionId: string) => void;
 }) {
   return (
-    <div className="panel rounded-[28px] p-4">
-      <div className="mb-4 flex items-center gap-2">
+    <section className="surface rounded-xl p-4">
+      <div className="mb-4 flex items-center gap-2 border-b border-[var(--border)] pb-3">
         <History className="h-4 w-4 text-[var(--accent-secondary)]" />
-        <h2 className="text-lg font-semibold">Recent Sessions</h2>
+        <h2 className="section-title">Recent sessions</h2>
       </div>
 
       <div className="space-y-2">
@@ -25,11 +25,7 @@ export function SessionList({
           <button
             key={snapshot.session.id}
             onClick={() => onOpen(snapshot.session.id)}
-            className={`w-full rounded-2xl border px-3 py-3 text-left transition ${
-              snapshot.session.id === activeSessionId
-                ? "border-[var(--border-strong)] bg-white/8"
-                : "border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-white/4"
-            }`}
+            className={`panel-list-button ${snapshot.session.id === activeSessionId ? "panel-list-button-active" : ""}`}
           >
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-medium">{snapshot.session.title}</div>
@@ -46,6 +42,6 @@ export function SessionList({
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }

@@ -14,36 +14,33 @@ export function TopToolbar({
   onManageAgents: () => void;
 }) {
   return (
-    <div className="panel rounded-[28px] px-5 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <section className="surface rounded-xl px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">
-            Control Room
-          </div>
-          <div className="mt-1 text-2xl font-semibold">
+          <h2 className="text-[26px] font-semibold tracking-[-0.02em]">
             {workspaceDetail?.workspace.name ?? "No workspace selected"}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
-            <span className="rounded-full border border-[var(--border)] px-3 py-1">
+          </h2>
+          <div className="meta-strip mt-3">
+            <span className="meta-chip">
               {workspaceDetail?.agents.length ?? 0} agents
             </span>
-            <span className="rounded-full border border-[var(--border)] px-3 py-1">
+            <span className="meta-chip">
               {workspaceDetail?.sessions.length ?? 0} saved sessions
             </span>
-            <span className="rounded-full border border-[var(--border)] px-3 py-1">
+            <span className="meta-chip">
               Shell access visible
             </span>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="rounded-full border border-[var(--border)] bg-black/10 px-4 py-2 text-sm">
+          <div className="meta-chip text-sm">
             <div className="flex items-center gap-2">
               <PlugZap className="h-4 w-4 text-[var(--accent-secondary)]" />
               Sidecar: {connectionState}
             </div>
           </div>
-          <div className="rounded-full border border-[var(--border)] bg-black/10 px-4 py-2 text-sm">
+          <div className="meta-chip text-sm">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-[var(--accent)]" />
               Streaming ready
@@ -55,6 +52,6 @@ export function TopToolbar({
           </Button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
