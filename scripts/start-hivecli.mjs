@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const orchestratorHealthUrl = "http://127.0.0.1:45231/health";
+const desktopUrl = "http://127.0.0.1:1420";
 const useTauri = process.argv.includes("--tauri");
 const children = [];
 
@@ -53,40 +54,40 @@ function spawnPnpm(label, args) {
   return child;
 }
 
-async function isHealthy() {
+async function isHealthy(url) {
   try {
-    const response = await fetch(orchestratorHealthUrl);
+    const response = await fetch(url);
     return response.ok;
   } catch {
     return false;
   }
 }
 
-async function waitForHealth(orchestrator, timeoutMs = 30000) {
+async function waitForHealth(url, processLabel, child, timeoutMs = 30000) {
   const start = Date.now();
 
   while (Date.now() - start < timeoutMs) {
-    if (await isHealthy()) {
+    if (await isHealthy(url)) {
       return;
     }
 
-    if (orchestrator.exitCode !== null) {
-      throw new Error(`Orchestrator exited early with code ${orchestrator.exitCode}.`);
+    if (child.exitCode !== null) {
+      throw new Error(`${processLabel} exited early with code ${child.exitCode}.`);
     }
 
     await delay(750);
   }
 
-  throw new Error("Timed out waiting for the orchestrator to become ready on 127.0.0.1:45231.");
+  throw new Error(`Timed out waiting for ${processLabel} to become ready on ${url}.`);
 }
 
 async function main() {
-  if (await isHealthy()) {
+  if (await isHealthy(orchestratorHealthUrl)) {
     console.log("HiveCLI orchestrator already running on 127.0.0.1:45231");
   } else {
     console.log("Starting HiveCLI orchestrator...");
     const orchestrator = spawnPnpm("orchestrator", ["--filter", "@hive/orchestrator", "dev"]);
-    await waitForHealth(orchestrator);
+    await waitForHealth(orchestratorHealthUrl, "orchestrator", orchestrator);
   }
 
   if (useTauri) {
@@ -98,8 +99,14 @@ async function main() {
     return;
   }
 
+  if (await isHealthy(desktopUrl)) {
+    console.log("HiveCLI frontend already running on http://localhost:1420");
+    return;
+  }
+
   console.log("Starting HiveCLI frontend at http://localhost:1420 ...");
   const desktop = spawnPnpm("desktop", ["--filter", "@hive/desktop", "dev"]);
+  await waitForHealth(desktopUrl, "frontend", desktop);
   desktop.on("exit", (code) => {
     process.exit(code ?? 0);
   });
