@@ -1,4 +1,5 @@
 import http from "node:http";
+import cors from "cors";
 import express from "express";
 
 import { config } from "./config";
@@ -12,6 +13,8 @@ import { EventHub } from "./ws/hub";
 export function createApp() {
   const app = express();
   app.use(express.json({ limit: "2mb" }));
+
+  app.use(cors());
 
   const database = createDatabase();
   bootstrapDatabase(database.sqlite);

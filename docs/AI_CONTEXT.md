@@ -17,7 +17,7 @@ Current stack:
 
 ## Current Status
 
-The repo is in a working MVP state.
+The repo is in a working MVP state with a redesigned 4-panel Codex CLI workspace.
 
 Implemented:
 
@@ -26,11 +26,64 @@ Implemented:
 - session history and replay
 - broadcast tasks
 - council mode with judge agent
+- **implementer agent step** (3-step pipeline: Workers → Judge → Implementer)
 - WebSocket event streaming
 - PTY-backed CLI agent runs
 - local startup launcher
-- redesigned desktop frontend
+- **4-panel terminal workspace UI** (Judge, Implementer, Worker A, Worker B)
+- **auto-workspace creation** with 4 Codex CLI agents on first launch
+- CORS support on orchestrator
 - README with screenshots
+
+## Recent Changes (4-Panel Redesign)
+
+The frontend was completely redesigned from a 3-column dashboard layout to a focused 4-panel terminal workspace.
+
+### Layout change:
+
+```
+BEFORE:                               AFTER:
+┌──────┬──────────┬────────┐          ┌──────────────┬──────────────┐
+│Roster│Agent Grid│Events  │          │  Judge       │  Implementer │
+│      │          │Council │          │  (terminal)  │  (terminal)  │
+│Prompt│          │        │          ├──────────────┼──────────────┤
+│      │          │        │          │  Worker A    │  Worker B    │
+└──────┴──────────┴────────┘          │  (terminal)  │  (terminal)  │
+                                      └──────────────┴──────────────┘
+                                      │         Prompt Bar          │
+                                      └─────────────────────────────┘
+```
+
+### Files modified:
+
+- `apps/desktop/src/pages/swarm-page.tsx` — complete rewrite to 4-panel grid
+- `apps/desktop/src/stores/app-store.ts` — added role-based agent mapping, `ensureCodexWorkspace()`, `runHiveTask()`, agent args migration
+- `apps/desktop/src/components/app-layout.tsx` — sidebar removed, replaced with minimal top bar
+- `apps/desktop/src/router.tsx` — swarm page is now the default `/` route
+- `apps/desktop/src/index.css` — full-viewport layout with `.hive-grid`, `.hive-panel`, role accents
+- `apps/desktop/src/components/terminal-pane.tsx` — now fills container dynamically
+- `packages/shared/src/council.ts` — added `buildImplementerPrompt()`
+- `apps/orchestrator/src/sessions/task-service.ts` — 3-step pipeline: Workers → Judge → Implementer
+- `apps/orchestrator/src/adapters/cli-adapter.ts` — Windows fix: spawns through `cmd.exe /c` for PATH resolution
+- `apps/orchestrator/src/index.ts` — added `cors` middleware
+- `apps/orchestrator/src/routes/api.ts` — added error logging to `/api/tasks/run`
+- `packages/shared/src/constants.ts` — codex template args updated to `["--approval-mode", "full-auto", "-q", "{{prompt}}"]`
+
+### Files created:
+
+- `apps/desktop/src/components/worker-terminal.tsx` — worker panel with green accent
+- `apps/desktop/src/components/judge-panel.tsx` — judge panel with amber accent
+- `apps/desktop/src/components/implementer-panel.tsx` — implementer panel with violet accent
+- `apps/desktop/src/components/prompt-bar.tsx` — compact bottom prompt bar
+
+### Key architectural decisions:
+
+- Codex CLI agents use `exec --full-auto "{{prompt}}"` to run non-interactively
+- On Windows, `node-pty` cannot resolve PATH, so `cli-adapter.ts` spawns through `cmd.exe /c`
+- The app-store auto-patches existing codex agents with empty args on workspace load
+- The implementer agent is identified by name convention (`"implementer"` in agent name)
+- Judge → Implementer handoff uses `buildImplementerPrompt()` from `@hive/shared`
+- The orchestrator also normalizes stale Codex agent args on the server before a run starts
 
 ## Startup
 
@@ -106,27 +159,41 @@ Ignored paths now include:
 - `.playwright-cli`
 - `output`
 
+CORS is enabled via the `cors` npm package in `apps/orchestrator/src/index.ts`.
+
+The `/api/tasks/run` route now has try/catch error logging to `console.error`.
+
 ## Frontend Notes
 
-The frontend was fully redesigned away from the original “generic AI dark dashboard” look.
+The frontend uses a full-viewport 4-panel layout designed for the Codex CLI council workflow.
 
 Current visual direction:
 
-- denser workstation UI
-- smaller radii
-- flatter surfaces
-- less pill-heavy
-- darker, warmer palette
-- less decorative hero/dashboard framing
+- dense workstation UI filling the entire viewport
+- 2×2 grid of terminal panels with 3px gaps
+- role-specific accent colors (worker=green, judge=amber, implementer=violet)
+- minimal top bar with branding and connection status
+- compact prompt bar at the bottom
+- darker, warmer palette (root background `#0e0d0c`)
 
 Highest-impact frontend files:
 
 - `apps/desktop/src/index.css`
 - `apps/desktop/src/components/app-layout.tsx`
-- `apps/desktop/src/pages/dashboard-page.tsx`
 - `apps/desktop/src/pages/swarm-page.tsx`
-- `apps/desktop/src/components/agent-panel.tsx`
-- `apps/desktop/src/components/prompt-composer.tsx`
+- `apps/desktop/src/stores/app-store.ts`
+- `apps/desktop/src/components/worker-terminal.tsx`
+- `apps/desktop/src/components/judge-panel.tsx`
+- `apps/desktop/src/components/implementer-panel.tsx`
+- `apps/desktop/src/components/prompt-bar.tsx`
+- `apps/desktop/src/components/terminal-pane.tsx`
+
+Unused legacy files (still in repo but not routed):
+
+- `apps/desktop/src/pages/dashboard-page.tsx`
+- `apps/desktop/src/pages/history-page.tsx`
+- `apps/desktop/src/components/session-list.tsx`
+- PascalCase component duplicates (e.g. `AgentPanel.tsx`, `SwarmPage.tsx`)
 
 ## Skills / Design Guidance Used
 
@@ -145,16 +212,20 @@ Important safety note:
 
 ## Tests / Validation Already Run
 
-These were run successfully after the Node 25 compatibility changes:
+These were run successfully after the 4-panel redesign and the Codex CLI fix:
 
-- `pnpm --filter @hive/orchestrator test`
-- `pnpm build`
-- `pnpm start`
+- `pnpm --filter @hive/orchestrator test` — 2/2 passed
+- `pnpm test:ui` — Playwright smoke passes against the live 4-panel UI
+- `pnpm build` — exit code 0
+- `pnpm start` — both servers start cleanly
+- Direct API test: `POST /api/tasks/run` with real agent IDs returns `sessionId`/`taskId`
+- Real council run with four Codex agents completed with exit code `0` for worker A, worker B, judge, and implementer
 
 Verified startup behavior:
 
 - orchestrator health endpoint responds on `http://127.0.0.1:45231/health`
 - frontend responds on `http://localhost:1420`
+- 4-panel UI loads with auto-created Codex workspace
 
 ## Known Caveats
 
@@ -162,6 +233,10 @@ Verified startup behavior:
 - `pnpm start:tauri` uses the same launcher logic, but real Tauri testing still depends on Rust being installed
 - desktop bundle chunk size is still large; Vite warns about a large JS chunk
 - `node:sqlite` is currently experimental in Node, though it works for this repo on Node 25
+- On Windows, `node-pty` requires `cmd.exe /c` wrapper to resolve PATH for CLI commands
+- Codex CLI must be installed and authorized (`OPENAI_API_KEY`) for agents to produce output
+- The `cors` npm package was added as a runtime dependency to `@hive/orchestrator`
+- The shared package exports from `dist`, so after changing `packages/shared/src/*`, rebuild `@hive/shared` or run a full `pnpm build` before relying on the desktop dev server
 
 ## Files Most Likely To Matter Next
 
@@ -169,7 +244,9 @@ If continuing product work, likely touch these:
 
 - `apps/desktop/src/pages/*`
 - `apps/desktop/src/components/*`
+- `apps/desktop/src/stores/app-store.ts`
 - `apps/orchestrator/src/sessions/task-service.ts`
+- `apps/orchestrator/src/adapters/cli-adapter.ts`
 - `apps/orchestrator/src/routes/api.ts`
 - `packages/shared/src/*`
 
@@ -192,7 +269,11 @@ Current remote work was being pushed incrementally to:
 ## Practical Guidance For The Next Agent
 
 - Build after making changes. The user explicitly asked for that.
-- Prefer preserving the redesigned frontend direction instead of drifting back toward rounded/glassy/pill-heavy UI.
+- Prefer preserving the 4-panel terminal workspace layout.
 - Do not reintroduce `better-sqlite3` unless there is a strong reason.
 - If touching startup, keep `pnpm start` idempotent.
 - If touching tests around PTY on Windows, prefer `process.execPath` over hardcoded `node`.
+- On Windows, always spawn CLI agents through `cmd.exe /c` in `node-pty` for PATH resolution.
+- Codex CLI agents must use `exec --full-auto "{{prompt}}"` args to run non-interactively.
+- The app-store and orchestrator both patch codex agents with stale or empty args.
+- Use `pnpm test:ui` for browser automation. It runs a Playwright smoke test against the live 4-panel workflow and writes `.hivecli/playwright-smoke.png`.

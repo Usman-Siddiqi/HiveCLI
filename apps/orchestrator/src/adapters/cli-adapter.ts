@@ -46,7 +46,13 @@ export class CliAgentAdapter implements AgentAdapter {
 
     handlers.onStatus("running");
 
-    const ptyProcess = pty.spawn(command, args, {
+    // On Windows, node-pty cannot resolve PATH on its own, so we spawn
+    // through cmd.exe. On Unix, spawn directly.
+    const isWindows = process.platform === "win32";
+    const spawnCommand = isWindows ? "cmd.exe" : command;
+    const spawnArgs = isWindows ? ["/c", command, ...args] : args;
+
+    const ptyProcess = pty.spawn(spawnCommand, spawnArgs, {
       name: "xterm-color",
       cols: 120,
       rows: 40,

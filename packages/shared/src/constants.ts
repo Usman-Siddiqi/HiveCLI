@@ -22,6 +22,22 @@ export const AGENT_RUN_STATES = [
   "cancelled",
 ] as const;
 
+export const CODEX_CLI_ARGS = ["exec", "--full-auto", "{{prompt}}"] as const;
+
+export const LEGACY_CODEX_CLI_ARGS = ["--approval-mode", "full-auto", "-q", "{{prompt}}"] as const;
+
+export function isLegacyCodexCliArgs(args: string[] | undefined) {
+  if (!args || args.length !== LEGACY_CODEX_CLI_ARGS.length) {
+    return false;
+  }
+
+  return LEGACY_CODEX_CLI_ARGS.every((value, index) => args[index] === value);
+}
+
+export function shouldMigrateCodexCliArgs(args: string[] | undefined) {
+  return !args || args.length === 0 || isLegacyCodexCliArgs(args);
+}
+
 export const BUILTIN_AGENT_TEMPLATES = [
   {
     id: "codex-cli",
@@ -29,7 +45,7 @@ export const BUILTIN_AGENT_TEMPLATES = [
     type: "cli",
     provider: "codex",
     command: "codex",
-    args: [],
+    args: [...CODEX_CLI_ARGS],
     canJudge: true,
     shellAccess: true,
   },

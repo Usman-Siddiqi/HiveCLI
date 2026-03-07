@@ -1,161 +1,87 @@
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
-import type { TaskMode } from "@hive/shared";
+import { useMemo } from "react";
 
-import { AgentConfigModal } from "@/components/agent-config-modal";
-import { AgentGrid } from "@/components/agent-grid";
-import { CouncilSummaryPanel } from "@/components/council-summary-panel";
-import { EventLogPanel } from "@/components/event-log-panel";
-import { PromptComposer } from "@/components/prompt-composer";
-import { StatusBar } from "@/components/status-bar";
-import { TopToolbar } from "@/components/top-toolbar";
-import { Button } from "@/components/ui/button";
-import { api } from "@/lib/api";
+import { ImplementerPanel } from "@/components/implementer-panel";
+import { JudgePanel } from "@/components/judge-panel";
+import { PromptBar } from "@/components/prompt-bar";
+import { WorkerTerminal } from "@/components/worker-terminal";
 import { useAppStore } from "@/stores/app-store";
 
 export function SwarmPage() {
   const {
     workspaceDetail,
-    selectedAgentIds,
-    judgeAgentId,
     runOutputs,
-    events,
-    activeSession,
+    roles,
     connectionState,
-    selectAgents,
-    setJudgeAgentId,
-    refreshSessions,
-    loadSession,
+    runHiveTask,
   } = useAppStore();
-  const [modalOpen, setModalOpen] = useState(false);
 
-  const outputMap = useMemo(() => {
-    if (!workspaceDetail) {
-      return {};
-    }
+  const getAgentOutput = useMemo(() => {
+    return (agentId?: string) => {
+      if (!agentId) return { status: "idle", output: "" };
+      const entry = Object.values(runOutputs).find((e) => e.run.agentId === agentId);
+      return {
+        status: entry?.run.status ?? "idle",
+        output: entry?.output ?? "",
+      };
+    };
+  }, [runOutputs]);
 
-    return Object.fromEntries(
-      workspaceDetail.agents.map((agent) => {
-        const state = Object.values(runOutputs).find((entry) => entry.run.agentId === agent.id);
-        return [agent.id, state];
-      }),
-    );
-  }, [runOutputs, workspaceDetail]);
+  const getAgentName = (agentId?: string) => {
+    if (!agentId || !workspaceDetail) return "—";
+    return workspaceDetail.agents.find((a) => a.id === agentId)?.name ?? "—";
+  };
 
-  const judgeRun = judgeAgentId
-    ? Object.values(runOutputs).find((entry) => entry.run.agentId === judgeAgentId)?.run
-    : undefined;
-
-  async function handleSubmit({ prompt, mode }: { prompt: string; mode: TaskMode }) {
-    if (!workspaceDetail) {
-      return;
-    }
-
-    const response = await api.runTask({
-      workspaceId: workspaceDetail.workspace.id,
-      sessionId: activeSession?.session.id,
-      prompt,
-      mode,
-      agentIds: selectedAgentIds,
-      judgeAgentId: mode === "council" ? judgeAgentId : null,
-    });
-
-    await refreshSessions(workspaceDetail.workspace.id);
-    await loadSession(response.sessionId);
-  }
+  const workerA = getAgentOutput(roles.workerA);
+  const workerB = getAgentOutput(roles.workerB);
+  const judge = getAgentOutput(roles.judge);
+  const implementer = getAgentOutput(roles.implementer);
 
   if (!workspaceDetail) {
     return (
-      <div className="surface flex min-h-[70vh] items-center justify-center rounded-xl p-6 text-[var(--muted)]">
-        Create or open a workspace from the dashboard to start a swarm session.
+      <div className="flex flex-1 items-center justify-center text-sm text-[var(--muted)]">
+        Loading workspace…
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <TopToolbar
-        workspaceDetail={workspaceDetail}
-        connectionState={connectionState}
-        onManageAgents={() => setModalOpen(true)}
-      />
+    <>
+      <div className="hive-grid">
+        {/* Top-left: Judge */}
+        <JudgePanel
+          agentName={getAgentName(roles.judge)}
+          status={judge.status}
+          content={judge.output}
+        />
 
-      <div className="grid gap-6 xl:grid-cols-[272px_1fr_320px]">
-        <div className="space-y-5">
-          <section className="surface rounded-xl p-4">
-            <div className="mb-4 flex items-center justify-between border-b border-[var(--border)] pb-3">
-              <div>
-                <h2 className="section-title">Workspace roster</h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  Toggle the agents that should receive the next task.
-                </p>
-              </div>
-              <Button size="sm" onClick={() => setModalOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Add
-              </Button>
-            </div>
+        {/* Top-right: Implementer */}
+        <ImplementerPanel
+          agentName={getAgentName(roles.implementer)}
+          status={implementer.status}
+          content={implementer.output}
+        />
 
-            <div className="space-y-2">
-              {workspaceDetail.agents.map((agent) => (
-                <button
-                  key={agent.id}
-                  onClick={() =>
-                    selectAgents(
-                      selectedAgentIds.includes(agent.id)
-                        ? selectedAgentIds.filter((id) => id !== agent.id)
-                        : [...selectedAgentIds, agent.id],
-                    )
-                  }
-                  className={`panel-list-button ${
-                    selectedAgentIds.includes(agent.id) ? "panel-list-button-active" : ""
-                  }`}
-                >
-                  <div className="text-sm font-medium">{agent.name}</div>
-                  <div className="mt-1 text-xs text-[var(--muted)]">
-                    {agent.provider} · {agent.command}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
+        {/* Bottom-left: Worker A */}
+        <WorkerTerminal
+          label="Worker A"
+          agentName={getAgentName(roles.workerA)}
+          status={workerA.status}
+          content={workerA.output}
+        />
 
-          <PromptComposer
-            agents={workspaceDetail.agents}
-            selectedAgentIds={selectedAgentIds}
-            judgeAgentId={judgeAgentId}
-            onJudgeChange={setJudgeAgentId}
-            onSubmit={handleSubmit}
-          />
-
-          <StatusBar
-            selectedCount={selectedAgentIds.length}
-            judgeName={workspaceDetail.agents.find((agent) => agent.id === judgeAgentId)?.name}
-          />
-        </div>
-
-        <div className="space-y-5">
-          <AgentGrid
-            agents={workspaceDetail.agents}
-            selectedAgentIds={selectedAgentIds}
-            outputs={outputMap}
-            onToggle={(agentId) =>
-              selectAgents(
-                selectedAgentIds.includes(agentId)
-                  ? selectedAgentIds.filter((id) => id !== agentId)
-                  : [...selectedAgentIds, agentId],
-              )
-            }
-          />
-        </div>
-
-        <div className="space-y-5">
-          <CouncilSummaryPanel judgeRun={judgeRun} />
-          <EventLogPanel events={events} />
-        </div>
+        {/* Bottom-right: Worker B */}
+        <WorkerTerminal
+          label="Worker B"
+          agentName={getAgentName(roles.workerB)}
+          status={workerB.status}
+          content={workerB.output}
+        />
       </div>
 
-      <AgentConfigModal open={modalOpen} onOpenChange={setModalOpen} />
-    </div>
+      <PromptBar
+        onSubmit={runHiveTask}
+        disabled={connectionState !== "open"}
+      />
+    </>
   );
 }

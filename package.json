@@ -12,11 +12,13 @@
     "build": "pnpm -r --if-present build",
     "check": "pnpm -r --if-present check",
     "lint": "pnpm -r --if-present lint",
+    "test:ui": "node ./scripts/playwright-smoke.mjs",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
+    "playwright": "^1.58.2",
     "typescript": "^5.9.3"
   }
 }

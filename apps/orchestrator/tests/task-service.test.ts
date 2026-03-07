@@ -10,7 +10,7 @@ import { TaskService } from "../src/sessions/task-service";
 
 describe("TaskService", () => {
   it(
-    "runs multiple CLI agents and auto-runs a judge in council mode",
+    "runs worker, judge, and implementer agents in council mode",
     async () => {
       const databasePath = path.join(os.tmpdir(), `hivecli-${Date.now()}.db`);
       const database = createDatabase(databasePath);
@@ -46,23 +46,22 @@ describe("TaskService", () => {
       const codex = await makeAgent("Codex CLI", "codex");
       const gemini = await makeAgent("Gemini CLI", "gemini");
       const judge = await makeAgent("Judge", "judge", true);
+      const implementer = await makeAgent("Implementer", "implementer");
 
       const result = await service.runTask({
         workspaceId: workspace.id,
         prompt: "ship it",
         mode: "council",
-        agentIds: [codex.id, gemini.id, judge.id],
+        agentIds: [codex.id, gemini.id, judge.id, implementer.id],
         judgeAgentId: judge.id,
       });
 
       const replay = await repository.getSessionReplay(result.sessionId);
       expect(replay?.tasks).toHaveLength(1);
-      expect(replay?.tasks[0]?.runs).toHaveLength(3);
-      expect(
-        replay?.tasks[0]?.runs.some(
-          (run) => run.agentId === judge.id && run.finalText?.includes("ship it"),
-        ),
-      ).toBe(true);
+      expect(replay?.tasks[0]?.runs).toHaveLength(4);
+      expect(replay?.tasks[0]?.runs.map((run) => run.agentId).sort()).toEqual(
+        [codex.id, gemini.id, judge.id, implementer.id].sort(),
+      );
       expect(events.length).toBeGreaterThan(0);
     },
     20000,

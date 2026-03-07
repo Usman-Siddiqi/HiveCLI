@@ -61,9 +61,14 @@ export function createApiRouter(repository: Repository, taskService: TaskService
     response.json({ ok: true });
   });
 
-  router.post("/api/tasks/run", async (request, response) => {
-    const input = runTaskInputSchema.parse(request.body);
-    response.status(201).json(await taskService.runTask(input));
+  router.post("/api/tasks/run", async (request, response, next) => {
+    try {
+      const input = runTaskInputSchema.parse(request.body);
+      response.status(201).json(await taskService.runTask(input));
+    } catch (err) {
+      console.error("[tasks/run] Error:", err);
+      next(err);
+    }
   });
 
   router.get("/api/settings", async (_request, response) => {

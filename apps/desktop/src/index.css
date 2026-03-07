@@ -3,21 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --bg: #141210;
-  --bg-deep: #0f0d0c;
-  --surface: rgba(28, 25, 22, 0.94);
-  --surface-muted: rgba(23, 21, 19, 0.96);
-  --surface-strong: rgba(16, 14, 12, 0.98);
-  --border: rgba(92, 82, 72, 0.46);
-  --border-strong: rgba(149, 132, 114, 0.78);
-  --text: #ede4d8;
-  --muted: #9c9284;
+  --bg: #0e0d0c;
+  --bg-deep: #0a0908;
+  --surface: rgba(22, 20, 18, 0.96);
+  --surface-muted: rgba(18, 16, 15, 0.97);
+  --surface-strong: rgba(14, 12, 11, 0.98);
+  --border: rgba(72, 64, 56, 0.5);
+  --border-strong: rgba(120, 106, 92, 0.7);
+  --text: #e8e0d4;
+  --muted: #8a8278;
   --accent: #c48b3b;
-  --accent-soft: rgba(196, 139, 59, 0.18);
-  --accent-secondary: #7d9483;
+  --accent-soft: rgba(196, 139, 59, 0.15);
+  --accent-secondary: #6b9e7a;
+  --implement: #9b7ed8;
   --warning: #d0a15c;
   --danger: #c06a58;
-  --shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
 }
 
 * {
@@ -27,22 +28,14 @@
 html,
 body,
 #root {
-  min-height: 100%;
+  height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
   color: var(--text);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 160px),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.012) 0,
-      rgba(255, 255, 255, 0.012) 1px,
-      transparent 1px,
-      transparent 96px
-    ),
-    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  background: var(--bg);
   font-family: "IBM Plex Sans", "Aptos", sans-serif;
   letter-spacing: -0.01em;
 }
@@ -58,27 +51,176 @@ textarea {
   background: rgba(196, 139, 59, 0.28);
 }
 
+/* ─── Full-viewport app shell ─── */
+
 @layer components {
   .app-shell {
-    @apply min-h-screen;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
   }
 
-  .app-frame {
-    @apply grid min-h-screen grid-cols-[248px_1fr];
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    flex-shrink: 0;
+    padding: 0 16px;
+    background: var(--surface-strong);
+    border-bottom: 1px solid var(--border);
   }
 
-  .app-sidebar {
-    background: rgba(18, 16, 14, 0.98);
-    border-right: 1px solid var(--border);
+  .app-topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    text-transform: uppercase;
   }
 
-  .app-sidebar-content {
-    @apply flex h-full flex-col px-5 py-6;
+  .app-topbar-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
   }
 
-  .app-main {
-    @apply min-h-screen px-8 py-7;
+  /* ─── 4-panel grid ─── */
+
+  .hive-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3px;
+    flex: 1;
+    min-height: 0;
+    padding: 3px;
+    background: var(--bg-deep);
   }
+
+  .hive-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .hive-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 36px;
+    flex-shrink: 0;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-muted);
+  }
+
+  .hive-panel-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .hive-panel-body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Role accents */
+  .role-worker .hive-panel-header {
+    border-left: 3px solid var(--accent-secondary);
+  }
+  .role-worker .hive-panel-label {
+    color: var(--accent-secondary);
+  }
+
+  .role-judge .hive-panel-header {
+    border-left: 3px solid var(--accent);
+  }
+  .role-judge .hive-panel-label {
+    color: var(--accent);
+  }
+
+  .role-implementer .hive-panel-header {
+    border-left: 3px solid var(--implement);
+  }
+  .role-implementer .hive-panel-label {
+    color: var(--implement);
+  }
+
+  /* ─── Prompt bar ─── */
+
+  .hive-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 52px;
+    flex-shrink: 0;
+    padding: 6px 12px;
+    background: var(--surface-strong);
+    border-top: 1px solid var(--border);
+  }
+
+  .hive-bar-input {
+    flex: 1;
+    resize: none;
+    height: 36px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.4;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .hive-bar-input:focus {
+    border-color: var(--accent);
+  }
+
+  .hive-bar-input::placeholder {
+    color: var(--muted);
+  }
+
+  .hive-bar-send {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #0e0d0c;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+
+  .hive-bar-send:hover {
+    opacity: 0.9;
+  }
+
+  .hive-bar-send:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* ─── Utility ─── */
 
   .surface {
     background: var(--surface);
@@ -86,80 +228,17 @@ textarea {
     box-shadow: var(--shadow);
   }
 
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
-  }
-
-  .surface-muted {
-    background: var(--surface-muted);
-    border: 1px solid var(--border);
-  }
-
-  .surface-strong {
-    background: var(--surface-strong);
-    border: 1px solid var(--border);
+  .terminal-font {
+    font-family: "IBM Plex Mono", "Consolas", monospace;
   }
 
   .section-title {
     @apply text-base font-semibold tracking-[-0.01em];
   }
 
-  .section-copy {
-    @apply text-sm leading-6;
-    color: var(--muted);
-  }
-
-  .meta-strip {
-    @apply flex flex-wrap items-center gap-2 text-xs;
-    color: var(--muted);
-  }
-
   .meta-chip {
     @apply inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs;
     border: 1px solid var(--border);
     background: rgba(255, 255, 255, 0.02);
-  }
-
-  .shell-link {
-    @apply flex items-center gap-3 px-3 py-2.5 text-sm transition;
-    border-left: 2px solid transparent;
-    color: var(--muted);
-  }
-
-  .shell-link:hover {
-    background: rgba(255, 255, 255, 0.03);
-    color: var(--text);
-  }
-
-  .shell-link-active {
-    border-left-color: var(--accent);
-    background: rgba(196, 139, 59, 0.1);
-    color: var(--text);
-  }
-
-  .panel-list-button {
-    @apply w-full rounded-lg px-3 py-3 text-left transition;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .panel-list-button:hover {
-    border-color: var(--border-strong);
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .panel-list-button-active {
-    border-color: var(--border-strong);
-    background: rgba(196, 139, 59, 0.08);
-  }
-
-  .subtle-rule {
-    border-top: 1px solid var(--border);
-  }
-
-  .terminal-font {
-    font-family: "IBM Plex Mono", "Consolas", monospace;
   }
 }
