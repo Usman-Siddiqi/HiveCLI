@@ -107,6 +107,34 @@ Approve the native builds for `better-sqlite3`, `node-pty`, and `esbuild` when p
 
 ### Run The App
 
+Fastest path on Windows:
+
+```powershell
+.\Start-HiveCLI.ps1
+```
+
+That starts the orchestrator first, waits for it to become ready on `127.0.0.1:45231`, then launches the frontend on `http://localhost:1420`.
+
+You can also use:
+
+```powershell
+pnpm start
+```
+
+If Rust/Tauri is installed and you want the desktop shell:
+
+```powershell
+.\Start-HiveCLI.ps1 -Tauri
+```
+
+or:
+
+```powershell
+pnpm run start:tauri
+```
+
+Manual startup is still available:
+
 Start the orchestrator:
 
 ```powershell

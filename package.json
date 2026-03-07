@@ -6,6 +6,8 @@
     "node": ">=22 <23"
   },
   "scripts": {
+    "start": "powershell -ExecutionPolicy Bypass -File ./Start-HiveCLI.ps1",
+    "start:tauri": "powershell -ExecutionPolicy Bypass -File ./Start-HiveCLI.ps1 -Tauri",
     "dev": "pnpm -r --parallel --if-present dev",
     "build": "pnpm -r --if-present build",
     "check": "pnpm -r --if-present check",
