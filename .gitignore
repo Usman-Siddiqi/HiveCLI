@@ -10,3 +10,5 @@ coverage
 .env.local
 apps/desktop/src-tauri/target
 apps/orchestrator/data
+.playwright-cli
+output
