@@ -33,7 +33,7 @@ describe("TaskService", () => {
           name,
           type: "cli",
           provider: label,
-          command: "node",
+          command: process.execPath,
           args: [scriptPath, "--label", label, "--prompt", "{{prompt}}"],
           cwd: process.cwd(),
           env: {},

@@ -90,7 +90,7 @@ docs/
 
 ### Requirements
 
-- Node 22 LTS
+- Node 22 to 25
 - pnpm 10+
 - Rust toolchain for the Tauri shell
 - Windows-first environment for the current MVP
@@ -114,8 +114,6 @@ Fastest path on Windows:
 ```
 
 That starts the orchestrator first, waits for it to become ready on `127.0.0.1:45231`, then launches the frontend on `http://localhost:1420`.
-
-If startup fails immediately, check your Node version first. The launcher now refuses to run on anything other than Node 22 LTS.
 
 You can also use:
 
@@ -201,10 +199,9 @@ This stores:
 
 ## Current MVP Caveats
 
-- The desktop UI currently expects the orchestrator to be running separately on `127.0.0.1:45231`.
 - Tauri runtime config is wired in, but automatic sidecar spawning is not finished yet.
 - The initial adapter runtime is terminal-first. Direct OpenAI, Anthropic, and Gemini API adapters are not implemented in this slice.
-- Native dependencies require a compatible Node 22 environment.
+- Native dependencies still need to be built locally for your current Node installation.
 
 ## Notes For Testing
 

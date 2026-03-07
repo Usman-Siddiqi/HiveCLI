@@ -1,6 +1,24 @@
+import fs from "node:fs";
 import path from "node:path";
 
-const root = process.cwd();
+function resolveRepoRoot(startDir = process.cwd()) {
+  let current = path.resolve(startDir);
+
+  while (true) {
+    if (fs.existsSync(path.join(current, "pnpm-workspace.yaml"))) {
+      return current;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return path.resolve(startDir);
+    }
+
+    current = parent;
+  }
+}
+
+const root = resolveRepoRoot();
 
 export const config = {
   host: process.env.HIVECLI_HOST ?? "127.0.0.1",

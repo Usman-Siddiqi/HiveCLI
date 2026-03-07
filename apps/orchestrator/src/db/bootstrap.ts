@@ -1,6 +1,6 @@
-import type Database from "better-sqlite3";
+import type { DatabaseSync } from "node:sqlite";
 
-export function bootstrapDatabase(sqlite: Database.Database) {
+export function bootstrapDatabase(sqlite: DatabaseSync) {
   sqlite.exec(`
     create table if not exists workspaces (
       id text primary key,

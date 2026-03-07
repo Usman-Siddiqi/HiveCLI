@@ -10,5 +10,7 @@ coverage
 .env.local
 apps/desktop/src-tauri/target
 apps/orchestrator/data
+apps/orchestrator/apps
 .playwright-cli
 output
+.hivecli
