@@ -1,0 +1,36 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+      "@hive/shared": ["../../packages/shared/src/index.ts"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": [
+    "src/App.tsx",
+    "src/components/AgentConfigModal.tsx",
+    "src/components/AgentGrid.tsx",
+    "src/components/AgentPanel.tsx",
+    "src/components/CouncilSummaryPanel.tsx",
+    "src/components/EventLogPanel.tsx",
+    "src/components/PromptComposer.tsx",
+    "src/components/ResponsePane.tsx",
+    "src/components/SessionList.tsx",
+    "src/components/StatusBar.tsx",
+    "src/components/TerminalPane.tsx",
+    "src/components/TopToolbar.tsx",
+    "src/components/WorkspaceSidebar.tsx",
+    "src/components/ui/badge.tsx",
+    "src/lib/orchestrator-client.ts",
+    "src/lib/tauri.ts",
+    "src/pages/SessionHistoryPage.tsx",
+    "src/pages/SettingsPage.tsx",
+    "src/pages/SwarmPage.tsx",
+    "src/pages/WorkspaceDashboardPage.tsx",
+    "src/types/app.ts"
+  ]
+}

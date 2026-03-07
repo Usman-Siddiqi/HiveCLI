@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+.turbo
+.vite
+.cache
+coverage
+*.log
+.env
+.env.local
+apps/desktop/src-tauri/target
+apps/orchestrator/data

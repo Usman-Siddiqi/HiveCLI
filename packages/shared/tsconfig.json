@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "target": "ES2022",
+    "module": "ESNext",
+    "declaration": true,
+    "declarationMap": true
+  },
+  "include": [
+    "src/index.ts",
+    "src/constants.ts",
+    "src/council.ts",
+    "src/schemas.ts",
+    "src/types.ts"
+  ]
+}

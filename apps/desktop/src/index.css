@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #09111d;
+  --panel: rgba(11, 22, 38, 0.84);
+  --panel-strong: rgba(8, 17, 30, 0.96);
+  --border: rgba(117, 149, 196, 0.18);
+  --border-strong: rgba(124, 171, 255, 0.3);
+  --text: #eff5ff;
+  --muted: #93a7c5;
+  --accent: #7cf5cb;
+  --accent-secondary: #69b4ff;
+  --warning: #ffc978;
+  --shadow: 0 32px 96px rgba(0, 0, 0, 0.36);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(105, 180, 255, 0.14), transparent 30%),
+    radial-gradient(circle at top right, rgba(124, 245, 203, 0.14), transparent 28%),
+    linear-gradient(180deg, #0a1220 0%, #04070d 100%);
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.grid-background {
+  position: relative;
+}
+
+.grid-background::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(124, 245, 203, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(105, 180, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  mask-image: linear-gradient(180deg, rgba(255, 255, 255, 0.65), transparent);
+}
+
+.terminal-font {
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+}
