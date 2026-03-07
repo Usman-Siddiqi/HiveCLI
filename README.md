@@ -115,6 +115,8 @@ Fastest path on Windows:
 
 That starts the orchestrator first, waits for it to become ready on `127.0.0.1:45231`, then launches the frontend on `http://localhost:1420`.
 
+If startup fails immediately, check your Node version first. The launcher now refuses to run on anything other than Node 22 LTS.
+
 You can also use:
 
 ```powershell
