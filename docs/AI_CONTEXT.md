@@ -33,7 +33,7 @@ Implemented:
 - **4-panel terminal workspace UI** (Judge, Implementer, Worker A, Worker B)
 - **auto-workspace creation** with 4 Codex CLI agents on first launch
 - CORS support on orchestrator
-- README with screenshots
+- README with one current live screenshot
 
 ## Recent Changes (4-Panel Redesign)
 
@@ -64,10 +64,10 @@ BEFORE:                               AFTER:
 - `apps/desktop/src/components/terminal-pane.tsx` — now fills container dynamically
 - `packages/shared/src/council.ts` — added `buildImplementerPrompt()`
 - `apps/orchestrator/src/sessions/task-service.ts` — 3-step pipeline: Workers → Judge → Implementer
-- `apps/orchestrator/src/adapters/cli-adapter.ts` — Windows fix: spawns through `cmd.exe /c` for PATH resolution
+- `apps/orchestrator/src/adapters/cli-adapter.ts` — Windows fix: resolves commands explicitly and uses `cmd.exe /c` when needed for PATH resolution
 - `apps/orchestrator/src/index.ts` — added `cors` middleware
 - `apps/orchestrator/src/routes/api.ts` — added error logging to `/api/tasks/run`
-- `packages/shared/src/constants.ts` — codex template args updated to `["--approval-mode", "full-auto", "-q", "{{prompt}}"]`
+- `packages/shared/src/constants.ts` — codex template args updated to `["exec", "--full-auto", "-m", "gpt-5.1-codex-mini", "-c", "model_reasoning_effort=medium", "{{prompt}}"]`
 
 ### Files created:
 
@@ -81,6 +81,7 @@ BEFORE:                               AFTER:
 - Codex CLI agents use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` to run non-interactively
 - On Windows, `cli-adapter.ts` resolves commands explicitly instead of relying on bare PATH lookup in `node-pty`
 - Codex on Windows uses a temp prompt file with stdin redirection so multiline judge/implementer prompts survive the shell hop
+- Codex final text is sanitized to remove trailing timestamped diagnostics after the answer
 - The app-store auto-patches existing codex agents with empty args on workspace load
 - The implementer agent is identified by name convention (`"implementer"` in agent name)
 - Judge → Implementer handoff uses `buildImplementerPrompt()` from `@hive/shared`
@@ -222,6 +223,7 @@ These were run successfully after the 4-panel redesign and the Codex CLI fix:
 - Direct API test: `POST /api/tasks/run` with real agent IDs returns `sessionId`/`taskId`
 - Real council run with four Codex agents completed with exit code `0` for worker A, worker B, judge, and implementer
 - Real Codex council run on Windows verified that both judge and implementer final outputs still contain the original unique token after the prompt-file fix
+- Fresh README screenshot captured from the live 4-panel UI in `docs/screenshots/swarm-live.png`
 
 Verified startup behavior:
 

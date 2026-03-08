@@ -1,68 +1,40 @@
 # HiveCLI
 
-HiveCLI is a local-first desktop control room for running several CLI-backed agents in parallel inside one workspace.
+HiveCLI is a local-first desktop workspace for running multiple CLI-backed agents in parallel, watching their output live, and chaining them through a lightweight council flow.
 
-The MVP focuses on:
+The current MVP is optimized for a 4-panel Codex CLI workflow:
 
-- multi-agent task orchestration
-- live streamed output
-- side-by-side comparison
-- council/judge synthesis
-- saved sessions and replay
-- a desktop-first developer UX
+- Worker A
+- Worker B
+- Judge
+- Implementer
 
-## Screenshots
+The app fans one prompt out to the workers, waits for them to settle, asks the judge to synthesize, then passes that verdict into the implementer for the final answer.
 
-### Dashboard
+## Screenshot
 
-![HiveCLI dashboard](docs/screenshots/dashboard.png)
+![HiveCLI live swarm run](docs/screenshots/swarm-live.png)
 
-### Swarm View
+## What Works Today
 
-![HiveCLI swarm view](docs/screenshots/swarm.png)
-
-### Session History
-
-![HiveCLI history view](docs/screenshots/history.png)
-
-### Settings
-
-![HiveCLI settings view](docs/screenshots/settings.png)
-
-## What The MVP Does
-
-- Create directory-backed workspaces.
-- Add several CLI-backed agents to each workspace.
-- Broadcast one prompt to multiple agents at once.
-- Stream each agent into its own panel.
-- Mark judge-capable agents and run council synthesis after source agents finish.
-- Persist workspaces, sessions, tasks, runs, messages, events, and settings in SQLite.
-- Reopen prior sessions and inspect final outputs plus the event timeline.
+- One-command local startup with `pnpm start`
+- Live multi-agent streaming over WebSockets
+- PTY-backed CLI agents via `node-pty`
+- Saved sessions and replay from local SQLite
+- Codex CLI templates with automatic migration for older agent configs
+- Council pipeline: workers -> judge -> implementer
+- Settings page for local provider and workspace defaults
 
 ## Stack
 
 - Desktop shell: Tauri 2
 - Frontend: React, TypeScript, Vite, Tailwind CSS
-- UI primitives: shadcn-style components
+- Runtime state: Zustand + React Query
 - Terminal rendering: xterm.js
 - Orchestrator: Node.js, TypeScript, Express, WebSockets
-- CLI process runtime: node-pty
-- Persistence: SQLite
-- Validation and shared contracts: Zod
-
-## Architecture
-
-```mermaid
-flowchart LR
-  UI["Tauri + React UI"] --> HTTP["HTTP API"]
-  UI --> WS["WebSocket event stream"]
-  HTTP --> ORCH["Node orchestrator"]
-  WS --> ORCH
-  ORCH --> ADAPTERS["CLI adapter layer"]
-  ADAPTERS --> PTY["node-pty sessions"]
-  ORCH --> DB["SQLite persistence"]
-  DB --> REPLAY["session replay / history"]
-```
+- Process runtime: node-pty
+- Persistence: SQLite via Node `node:sqlite`
+- Shared contracts: Zod + `packages/shared`
 
 ## Monorepo Layout
 
@@ -76,94 +48,65 @@ docs/
   screenshots/   README assets
 ```
 
-## Current Flow
-
-1. Start the local orchestrator.
-2. Start the desktop frontend.
-3. Create or open a workspace.
-4. Add 2 to 4 agents.
-5. Run a `broadcast` task or `council` task.
-6. Watch each pane stream independently.
-7. Reopen the saved session later from History or Dashboard.
-
 ## Getting Started
 
 ### Requirements
 
 - Node 22 to 25
 - pnpm 10+
-- Rust toolchain for the Tauri shell
 - Windows-first environment for the current MVP
+- Rust only if you want to run the Tauri shell directly
+- Installed and authorized CLI backends such as `codex`
 
 ### Install
 
 ```powershell
 pnpm install
-pnpm approve-builds
-pnpm rebuild better-sqlite3 node-pty esbuild
 ```
 
-Approve the native builds for `better-sqlite3`, `node-pty`, and `esbuild` when prompted.
-
-### Run The App
-
-Fastest path on Windows:
+If `node-pty` needs a local rebuild on your machine:
 
 ```powershell
-.\Start-HiveCLI.ps1
+pnpm rebuild node-pty
 ```
 
-That starts the orchestrator first, waits for it to become ready on `127.0.0.1:45231`, then launches the frontend on `http://localhost:1420`.
-
-You can also use:
+### Run
 
 ```powershell
 pnpm start
 ```
 
-If Rust/Tauri is installed and you want the desktop shell:
+That launcher:
+
+- starts the orchestrator if it is not already running on `127.0.0.1:45231`
+- reuses it if it is already up
+- starts the frontend on `http://localhost:1420`
+- exits cleanly if both services are already running
+
+PowerShell launcher:
 
 ```powershell
-.\Start-HiveCLI.ps1 -Tauri
+.\Start-HiveCLI.ps1
 ```
 
-or:
+If you have Rust/Tauri installed:
 
 ```powershell
 pnpm run start:tauri
 ```
 
-Manual startup is still available:
-
-Start the orchestrator:
-
-```powershell
-pnpm --filter @hive/orchestrator dev
-```
-
-In a second terminal, start the frontend:
-
-```powershell
-pnpm --filter @hive/desktop dev
-```
-
-Then open [http://localhost:1420](http://localhost:1420).
-
-If Rust/Tauri is installed, you can also run the desktop shell:
-
-```powershell
-pnpm --filter @hive/desktop dev:tauri
-```
-
-## Test Commands
+## Testing
 
 From the repo root:
 
 ```powershell
 pnpm typecheck
-pnpm build
 pnpm --filter @hive/orchestrator test
+pnpm test:ui
+pnpm build
 ```
+
+`pnpm test:ui` runs the Playwright smoke flow against the live app.
 
 ## Built-In Agent Templates
 
@@ -171,52 +114,36 @@ pnpm --filter @hive/orchestrator test
 - `Gemini CLI`
 - `Custom CLI`
 
-The CLI adapter supports prompt interpolation in commands and args via:
+Current Codex default:
 
-- `{{prompt}}`
-- `{{sessionId}}`
-- `{{taskId}}`
-- `{{workspaceRoot}}`
+```text
+codex exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"
+```
 
 ## Persistence
 
-The default local database path is:
+Default local database path:
 
 ```text
 apps/orchestrator/data/hivecli.db
 ```
 
-This stores:
+Tracked repo files do not include the local database, runtime logs, or saved local session artifacts.
 
-- workspaces
-- agents
-- sessions
-- tasks
-- agent runs
-- messages
-- events
-- settings
+## Current Caveats
 
-## Current MVP Caveats
+- The development path is still sidecar-style: the orchestrator runs separately from the Tauri shell during local dev.
+- This MVP is terminal-first. Direct OpenAI, Anthropic, and Gemini API adapters are not implemented yet.
+- `node:sqlite` works here on Node 25, but it is still marked experimental upstream.
+- `codex` behavior and supported model slugs depend on the local CLI version and auth mode.
 
-- Tauri runtime config is wired in, but automatic sidecar spawning is not finished yet.
-- The initial adapter runtime is terminal-first. Direct OpenAI, Anthropic, and Gemini API adapters are not implemented in this slice.
-- Native dependencies still need to be built locally for your current Node installation.
+## Roadmap
 
-## Notes For Testing
-
-- If `codex` or `gemini` are installed on your `PATH`, you can use the built-in templates directly.
-- If they are not installed, create a `Custom CLI` agent pointed at a simple local script or command that reads stdin and writes stdout.
-- Council mode excludes the judge from source-agent fan-out and runs the judge after all source runs settle.
-
-## Roadmap After MVP
-
-- real API-backed LLM adapters
-- orchestrator sidecar spawning from Tauri
-- layout persistence and drag-and-drop panes
-- diffing and git-aware workflows
-- approval gates for risky CLI actions
-- richer workflow chaining and templates
+- Direct API-backed LLM adapters
+- Tauri-bundled orchestrator startup
+- Layout persistence and drag/drop panel management
+- Safer approval gates for risky CLI actions
+- Git-aware workflows and richer task chaining
 
 ## License
 

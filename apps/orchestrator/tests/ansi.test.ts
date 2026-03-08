@@ -24,4 +24,14 @@ describe("sanitizeFinalText", () => {
       "The meaning of life is the meaning you create through how you live.",
     );
   });
+
+  it("drops trailing codex diagnostics after the final answer", () => {
+    const value = [
+      "Hive",
+      "2026-03-08T21:04:11.830146Z  WARN codex_protocol::openai_models: Model personality requested but model_messages is missing, falling back to base instructions.",
+      "model=gpt-5.1-codex-mini personality=pragmatic",
+    ].join("\n");
+
+    expect(sanitizeFinalText(value, "codex")).toBe("Hive");
+  });
 });
