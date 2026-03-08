@@ -22,7 +22,15 @@ export const AGENT_RUN_STATES = [
   "cancelled",
 ] as const;
 
-export const CODEX_CLI_ARGS = ["exec", "--full-auto", "{{prompt}}"] as const;
+export const CODEX_CLI_ARGS = [
+  "exec",
+  "--full-auto",
+  "-m",
+  "gpt-5.1-codex-mini",
+  "-c",
+  "model_reasoning_effort=medium",
+  "{{prompt}}",
+] as const;
 
 export const LEGACY_CODEX_CLI_ARGS = ["--approval-mode", "full-auto", "-q", "{{prompt}}"] as const;
 

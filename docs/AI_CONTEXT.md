@@ -78,7 +78,7 @@ BEFORE:                               AFTER:
 
 ### Key architectural decisions:
 
-- Codex CLI agents use `exec --full-auto "{{prompt}}"` to run non-interactively
+- Codex CLI agents use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` to run non-interactively
 - On Windows, `cli-adapter.ts` resolves commands explicitly instead of relying on bare PATH lookup in `node-pty`
 - Codex on Windows uses a temp prompt file with stdin redirection so multiline judge/implementer prompts survive the shell hop
 - The app-store auto-patches existing codex agents with empty args on workspace load
@@ -276,7 +276,7 @@ Current remote work was being pushed incrementally to:
 - If touching startup, keep `pnpm start` idempotent.
 - If touching tests around PTY on Windows, prefer `process.execPath` over hardcoded `node`.
 - On Windows, always spawn CLI agents through `cmd.exe /c` in `node-pty` for PATH resolution.
-- Codex CLI agents must use `exec --full-auto "{{prompt}}"` args to run non-interactively.
+- Codex CLI agents must use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` args to run non-interactively.
 - The app-store and orchestrator both patch codex agents with stale or empty args.
 - Use `pnpm test:ui` for browser automation. It runs a Playwright smoke test against the live 4-panel workflow and writes `.hivecli/playwright-smoke.png`.
 - For lower-cost manual/live testing on the current ChatGPT-backed Codex account, use `-c model_reasoning_effort=low`. Attempts to switch to `gpt-5-mini`, `gpt-5.4-mini`, `gpt-4.1`, and `gpt-4.1-mini` returned 400 model-not-supported errors in this environment.
