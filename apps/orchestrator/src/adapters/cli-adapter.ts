@@ -163,7 +163,7 @@ export class CliAgentAdapter implements AgentAdapter {
       ptyProcess.onExit(({ exitCode }) => {
         exitHandled = true;
         handlers.onExit(exitCode);
-        handlers.onFinal(sanitizeFinalText(stdoutBuffer));
+        handlers.onFinal(sanitizeFinalText(stdoutBuffer, agent.provider));
         if (tempPromptFile) {
           try {
             unlinkSync(tempPromptFile);

@@ -33,6 +33,15 @@ function shouldMigrateCodexAgentArgs(provider: string, args: string[] | undefine
   return provider === "codex" && shouldMigrateCodexCliArgs(args);
 }
 
+function isFixtureWorkspace(workspace: Workspace) {
+  return /^fixture\b/i.test(workspace.name.trim());
+}
+
+function pickInitialWorkspace(workspaces: Workspace[]) {
+  const firstRealWorkspace = workspaces.find((workspace) => !isFixtureWorkspace(workspace));
+  return firstRealWorkspace ?? workspaces[0];
+}
+
 interface AppState {
   runtimeReady: boolean;
   workspaces: Workspace[];
@@ -114,8 +123,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       (connectionState) => set({ connectionState }),
     );
 
-    if (workspaces[0]) {
-      await get().loadWorkspace(workspaces[0].id);
+    const initialWorkspace = pickInitialWorkspace(workspaces);
+
+    if (initialWorkspace) {
+      await get().loadWorkspace(initialWorkspace.id);
     } else {
       await get().ensureCodexWorkspace();
     }
