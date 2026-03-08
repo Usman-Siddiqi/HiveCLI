@@ -11,22 +11,42 @@ import {
 } from "@hive/shared";
 import { create } from "zustand";
 
-import { api } from "@/lib/api";
+import { api, type WorkspaceRootStatus } from "@/lib/api";
 import { getRuntimeConfig } from "@/lib/runtime";
-
-/* ─── Types ─── */
 
 interface LiveRunState {
   run: AgentRun;
   output: string;
 }
 
-/** Well-known agent roles in the 4-panel layout. */
 export interface HiveAgentRoles {
-  workerA?: string; // agent id
+  workerA?: string;
   workerB?: string;
   judge?: string;
   implementer?: string;
+}
+
+export interface CurrentTaskPaths {
+  rootPath: string;
+  sourceDir?: string;
+  runRootDir?: string;
+  publishDir?: string;
+  publishSource?: string;
+  artifactPaths?: string[];
+  workerAPath?: string;
+  workerBPath?: string;
+  judgePath?: string;
+  implementerPath?: string;
+}
+
+interface RunPathMetadata {
+  role?: string;
+  sourceDir?: string;
+  workingDir?: string;
+  runRootDir?: string;
+  publishDir?: string;
+  publishSource?: string;
+  artifactPaths?: string[];
 }
 
 function shouldMigrateCodexAgentArgs(provider: string, args: string[] | undefined) {
@@ -42,10 +62,100 @@ function pickInitialWorkspace(workspaces: Workspace[]) {
   return firstRealWorkspace ?? workspaces[0];
 }
 
+function assignRoles(agents: WorkspaceDetail["agents"]): HiveAgentRoles {
+  const find = (hints: string[]) =>
+    agents.find((agent) => hints.some((hint) => agent.name.toLowerCase().includes(hint)))?.id;
+
+  const workerA = find(["worker a", "worker-a", "worker_a"]) ?? agents[0]?.id;
+  const workerB = find(["worker b", "worker-b", "worker_b"]) ?? agents[1]?.id;
+  const judge = find(["judge"]) ?? agents.find((agent) => agent.canJudge)?.id ?? agents[2]?.id;
+  const implementer = find(["implementer", "implement"]) ?? agents[3]?.id;
+
+  return { workerA, workerB, judge, implementer };
+}
+
+function optimisticRootStatus(rootPath: string): WorkspaceRootStatus {
+  const hasPath = rootPath.trim().length > 0;
+  return {
+    rootPath,
+    resolvedPath: hasPath ? rootPath : null,
+    exists: hasPath,
+    isDirectory: hasPath,
+    valid: hasPath,
+    error: null,
+  };
+}
+
+function readRunPathMetadata(run?: AgentRun): RunPathMetadata {
+  if (!run?.metadata || typeof run.metadata !== "object") {
+    return {};
+  }
+
+  const metadata = run.metadata as Record<string, unknown>;
+  return {
+    role: typeof metadata.role === "string" ? metadata.role : undefined,
+    sourceDir: typeof metadata.sourceDir === "string" ? metadata.sourceDir : undefined,
+    workingDir: typeof metadata.workingDir === "string" ? metadata.workingDir : undefined,
+    runRootDir: typeof metadata.runRootDir === "string" ? metadata.runRootDir : undefined,
+    publishDir: typeof metadata.publishDir === "string" ? metadata.publishDir : undefined,
+    publishSource: typeof metadata.publishSource === "string" ? metadata.publishSource : undefined,
+    artifactPaths: Array.isArray(metadata.artifactPaths)
+      ? metadata.artifactPaths.filter((value): value is string => typeof value === "string")
+      : undefined,
+  };
+}
+
+function deriveCurrentTaskPaths(
+  workspaceDetail: WorkspaceDetail | undefined,
+  activeSession: SessionReplay | undefined,
+  liveOutputs: Record<string, LiveRunState>,
+  roles: HiveAgentRoles,
+): CurrentTaskPaths | undefined {
+  if (!workspaceDetail) {
+    return undefined;
+  }
+
+  const latestTask = activeSession?.tasks.at(-1);
+  const sourceRuns = latestTask?.runs?.length
+    ? latestTask.runs
+    : Object.values(liveOutputs).map((entry) => entry.run);
+
+  if (sourceRuns.length === 0) {
+    return {
+      rootPath: workspaceDetail.workspace.rootPath,
+    };
+  }
+
+  const byAgentId = new Map(sourceRuns.map((run) => [run.agentId, run]));
+  const workerAMeta = readRunPathMetadata(byAgentId.get(roles.workerA ?? ""));
+  const workerBMeta = readRunPathMetadata(byAgentId.get(roles.workerB ?? ""));
+  const judgeMeta = readRunPathMetadata(byAgentId.get(roles.judge ?? ""));
+  const implementerMeta = readRunPathMetadata(byAgentId.get(roles.implementer ?? ""));
+  const anyMeta = [workerAMeta, workerBMeta, judgeMeta, implementerMeta].find(
+    (metadata) => metadata.runRootDir || metadata.publishDir || metadata.sourceDir,
+  );
+
+  return {
+    rootPath: workspaceDetail.workspace.rootPath,
+    sourceDir: anyMeta?.sourceDir,
+    runRootDir: anyMeta?.runRootDir,
+    publishDir: anyMeta?.publishDir,
+    publishSource: implementerMeta.publishSource ?? anyMeta?.publishSource,
+    artifactPaths: judgeMeta.artifactPaths ?? implementerMeta.artifactPaths ?? anyMeta?.artifactPaths,
+    workerAPath: workerAMeta.workingDir,
+    workerBPath: workerBMeta.workingDir,
+    judgePath: judgeMeta.workingDir,
+    implementerPath: implementerMeta.workingDir,
+  };
+}
+
 interface AppState {
   runtimeReady: boolean;
   workspaces: Workspace[];
   workspaceDetail?: WorkspaceDetail;
+  workspaceRootStatus?: WorkspaceRootStatus;
+  workspaceError?: string;
+  currentTaskPaths?: CurrentTaskPaths;
   sessions: SessionSnapshot[];
   activeSession?: SessionReplay;
   runOutputs: Record<string, LiveRunState>;
@@ -57,12 +167,13 @@ interface AppState {
   loadWorkspace: (workspaceId: string) => Promise<void>;
   loadSession: (sessionId: string) => Promise<void>;
   refreshSessions: (workspaceId: string) => Promise<void>;
+  refreshWorkspaceRootStatus: (workspaceId?: string) => Promise<void>;
+  updateWorkspaceRoot: (rootPath: string) => Promise<void>;
+  clearWorkspaceError: () => void;
   pushEvent: (event: AgentEvent) => void;
   runHiveTask: (prompt: string) => Promise<void>;
   ensureCodexWorkspace: () => Promise<void>;
 }
-
-/* ─── WebSocket ─── */
 
 let socket: WebSocket | null = null;
 
@@ -87,23 +198,6 @@ function connectWebsocket(
     });
   });
 }
-
-/* ─── Helpers ─── */
-
-function assignRoles(agents: WorkspaceDetail["agents"]): HiveAgentRoles {
-  // Try to match by name convention, otherwise fall back to order
-  const find = (hints: string[]) =>
-    agents.find((a) => hints.some((h) => a.name.toLowerCase().includes(h)))?.id;
-
-  const workerA = find(["worker a", "worker-a", "worker_a"]) ?? agents[0]?.id;
-  const workerB = find(["worker b", "worker-b", "worker_b"]) ?? agents[1]?.id;
-  const judge = find(["judge"]) ?? agents.find((a) => a.canJudge)?.id ?? agents[2]?.id;
-  const implementer = find(["implementer", "implement"]) ?? agents[3]?.id;
-
-  return { workerA, workerB, judge, implementer };
-}
-
-/* ─── Store ─── */
 
 export const useAppStore = create<AppState>((set, get) => ({
   runtimeReady: false,
@@ -171,7 +265,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       api.listSessions(workspaceId),
     ]);
 
-    // Patch existing codex agents that still use the retired CLI invocation.
     for (const agent of workspaceDetail.agents) {
       if (shouldMigrateCodexAgentArgs(agent.provider, agent.args)) {
         const nextArgs = [...CODEX_CLI_ARGS];
@@ -182,11 +275,90 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const roles = assignRoles(workspaceDetail.agents);
 
-    set({ workspaceDetail, sessions, roles });
+    let workspaceRootStatus = optimisticRootStatus(workspaceDetail.workspace.rootPath);
+    try {
+      workspaceRootStatus = await api.getWorkspaceRootStatus(workspaceId);
+    } catch {
+      workspaceRootStatus = optimisticRootStatus(workspaceDetail.workspace.rootPath);
+    }
+
+    const nextTaskPaths = deriveCurrentTaskPaths(
+      workspaceDetail,
+      get().activeSession,
+      get().runOutputs,
+      roles,
+    );
+
+    set({
+      workspaceDetail,
+      sessions,
+      roles,
+      workspaceRootStatus,
+      currentTaskPaths: nextTaskPaths,
+      workspaceError: undefined,
+      workspaces: get().workspaces.map((workspace) =>
+        workspace.id === workspaceDetail.workspace.id ? workspaceDetail.workspace : workspace,
+      ),
+    });
   },
 
   refreshSessions: async (workspaceId) => {
     set({ sessions: await api.listSessions(workspaceId) });
+  },
+
+  refreshWorkspaceRootStatus: async (workspaceId) => {
+    const targetWorkspaceId = workspaceId ?? get().workspaceDetail?.workspace.id;
+    if (!targetWorkspaceId) {
+      return;
+    }
+
+    try {
+      const workspaceRootStatus = await api.getWorkspaceRootStatus(targetWorkspaceId);
+      set({ workspaceRootStatus });
+    } catch {
+      const rootPath = get().workspaceDetail?.workspace.rootPath ?? "";
+      set({ workspaceRootStatus: optimisticRootStatus(rootPath) });
+    }
+  },
+
+  updateWorkspaceRoot: async (rootPath) => {
+    const workspaceDetail = get().workspaceDetail;
+    if (!workspaceDetail) {
+      return;
+    }
+
+    const updatedWorkspace = await api.updateWorkspace(workspaceDetail.workspace.id, { rootPath });
+    set((state) => ({
+      workspaces: state.workspaces.map((workspace) =>
+        workspace.id === updatedWorkspace.id ? updatedWorkspace : workspace,
+      ),
+      workspaceDetail: state.workspaceDetail
+        ? {
+            ...state.workspaceDetail,
+            workspace: {
+              ...state.workspaceDetail.workspace,
+              rootPath: updatedWorkspace.rootPath,
+              updatedAt: updatedWorkspace.updatedAt,
+            },
+          }
+        : state.workspaceDetail,
+    }));
+
+    await get().refreshWorkspaceRootStatus(updatedWorkspace.id);
+
+    set({
+      currentTaskPaths: deriveCurrentTaskPaths(
+        get().workspaceDetail,
+        get().activeSession,
+        get().runOutputs,
+        get().roles,
+      ),
+      workspaceError: undefined,
+    });
+  },
+
+  clearWorkspaceError: () => {
+    set({ workspaceError: undefined });
   },
 
   loadSession: async (sessionId) => {
@@ -201,29 +373,64 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeSession,
       runOutputs,
       events: activeSession.events,
+      currentTaskPaths: deriveCurrentTaskPaths(
+        get().workspaceDetail,
+        activeSession,
+        runOutputs,
+        get().roles,
+      ),
     });
   },
 
   runHiveTask: async (prompt) => {
-    const { workspaceDetail, activeSession, roles, refreshSessions, loadSession } = get();
-    if (!workspaceDetail) return;
+    const {
+      workspaceDetail,
+      activeSession,
+      roles,
+      refreshSessions,
+      loadSession,
+      workspaceRootStatus,
+    } = get();
+
+    if (!workspaceDetail) {
+      return;
+    }
+
+    if (!workspaceRootStatus?.valid) {
+      set({ workspaceError: "Select a valid project directory before running a task." });
+      return;
+    }
 
     const allAgentIds = [roles.workerA, roles.workerB, roles.judge, roles.implementer].filter(Boolean) as string[];
 
-    // Clear previous outputs at the start of a new run
-    set({ runOutputs: {}, events: [] });
-
-    const response = await api.runTask({
-      workspaceId: workspaceDetail.workspace.id,
-      sessionId: activeSession?.session.id,
-      prompt,
-      mode: "council",
-      agentIds: allAgentIds,
-      judgeAgentId: roles.judge ?? null,
+    set({
+      runOutputs: {},
+      events: [],
+      workspaceError: undefined,
+      currentTaskPaths: {
+        rootPath: workspaceDetail.workspace.rootPath,
+      },
     });
 
-    await refreshSessions(workspaceDetail.workspace.id);
-    await loadSession(response.sessionId);
+    try {
+      const response = await api.runTask({
+        workspaceId: workspaceDetail.workspace.id,
+        sessionId: activeSession?.session.id,
+        prompt,
+        mode: "council",
+        agentIds: allAgentIds,
+        judgeAgentId: roles.judge ?? null,
+      });
+
+      await refreshSessions(workspaceDetail.workspace.id);
+      await loadSession(response.sessionId);
+    } catch (error) {
+      set({
+        workspaceError:
+          error instanceof Error ? error.message : "Task run failed before the agents could start.",
+      });
+      throw error;
+    }
   },
 
   pushEvent: (event) => {
@@ -262,16 +469,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextRun.finishedAt = new Date().toISOString();
     }
 
-    set((state) => ({
-      events: [event, ...state.events].slice(0, 400),
-      runOutputs: {
+    set((state) => {
+      const nextRunOutputs = {
         ...state.runOutputs,
         [event.agentRunId]: {
           run: nextRun,
           output: nextOutput,
         },
-      },
-    }));
+      };
+
+      return {
+        events: [event, ...state.events].slice(0, 400),
+        runOutputs: nextRunOutputs,
+        currentTaskPaths: deriveCurrentTaskPaths(
+          state.workspaceDetail,
+          state.activeSession,
+          nextRunOutputs,
+          state.roles,
+        ),
+      };
+    });
   },
 }));
 

@@ -1,6 +1,6 @@
 # HiveCLI
 
-HiveCLI is a local-first desktop workspace for running multiple CLI-backed agents in parallel, watching their output live, and chaining them through a lightweight council flow.
+HiveCLI is a local-first desktop workspace for running multiple CLI-backed agents in parallel, watching their output live, and chaining them through a folder-backed council flow.
 
 The current MVP is optimized for a 4-panel Codex CLI workflow:
 
@@ -9,7 +9,7 @@ The current MVP is optimized for a 4-panel Codex CLI workflow:
 - Judge
 - Implementer
 
-The app fans one prompt out to the workers, waits for them to settle, asks the judge to synthesize, then passes that verdict into the implementer for the final answer.
+The app fans one prompt out to the workers, seeds each worker from an isolated project snapshot, asks the judge to compare both responses and both folders, then passes that verdict into the implementer for the final published result.
 
 ## Screenshot
 
@@ -18,11 +18,12 @@ The app fans one prompt out to the workers, waits for them to settle, asks the j
 ## What Works Today
 
 - One-command local startup with `pnpm start`
+- Workspace-level project directory selection
 - Live multi-agent streaming over WebSockets
 - PTY-backed CLI agents via `node-pty`
 - Saved sessions and replay from local SQLite
 - Codex CLI templates with automatic migration for older agent configs
-- Council pipeline: workers -> judge -> implementer
+- Folder-backed council pipeline: workers -> judge -> implementer -> publish
 - Settings page for local provider and workspace defaults
 
 ## Stack
@@ -108,6 +109,27 @@ pnpm build
 
 `pnpm test:ui` runs the Playwright smoke flow against the live app.
 
+## Folder Workflow
+
+For each task run, HiveCLI creates:
+
+```text
+<project-dir>/hivecli-runs/<task-id>/
+  source/
+  worker-a/
+  worker-b/
+  judge/
+  implementer/
+```
+
+The final accepted result is published to:
+
+```text
+<project-dir>/publish/<task-id>
+```
+
+The original selected project directory is treated as source material and is not overwritten automatically.
+
 ## Built-In Agent Templates
 
 - `Codex CLI`
@@ -136,6 +158,7 @@ Tracked repo files do not include the local database, runtime logs, or saved loc
 - This MVP is terminal-first. Direct OpenAI, Anthropic, and Gemini API adapters are not implemented yet.
 - `node:sqlite` works here on Node 25, but it is still marked experimental upstream.
 - `codex` behavior and supported model slugs depend on the local CLI version and auth mode.
+- Large dependency/build folders are excluded from worker snapshots by default, but very large source trees will still make runs slower.
 
 ## Roadmap
 

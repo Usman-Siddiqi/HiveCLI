@@ -34,6 +34,7 @@ Implemented:
 - **auto-workspace creation** with 4 Codex CLI agents on first launch
 - CORS support on orchestrator
 - README with one current live screenshot
+- folder-backed project workflow with visible `hivecli-runs/<task-id>` and `publish/<task-id>`
 
 ## Recent Changes (4-Panel Redesign)
 
@@ -64,9 +65,11 @@ BEFORE:                               AFTER:
 - `apps/desktop/src/components/terminal-pane.tsx` — now fills container dynamically
 - `packages/shared/src/council.ts` — added `buildImplementerPrompt()`
 - `apps/orchestrator/src/sessions/task-service.ts` — 3-step pipeline: Workers → Judge → Implementer
+- `apps/orchestrator/src/sessions/run-workspace.ts` — run-folder prep, source seeding, judge diff artifacts, implementer publish
 - `apps/orchestrator/src/adapters/cli-adapter.ts` — Windows fix: resolves commands explicitly and uses `cmd.exe /c` when needed for PATH resolution
 - `apps/orchestrator/src/index.ts` — added `cors` middleware
 - `apps/orchestrator/src/routes/api.ts` — added error logging to `/api/tasks/run`
+- `apps/orchestrator/vitest.config.ts` — excludes generated `hivecli-runs/` and `publish/` trees from test discovery
 - `packages/shared/src/constants.ts` — codex template args updated to `["exec", "--full-auto", "-m", "gpt-5.1-codex-mini", "-c", "model_reasoning_effort=medium", "{{prompt}}"]`
 
 ### Files created:
@@ -75,10 +78,15 @@ BEFORE:                               AFTER:
 - `apps/desktop/src/components/judge-panel.tsx` — judge panel with amber accent
 - `apps/desktop/src/components/implementer-panel.tsx` — implementer panel with violet accent
 - `apps/desktop/src/components/prompt-bar.tsx` — compact bottom prompt bar
+- `apps/desktop/src/components/workspace-directory-control.tsx` — project directory rail with picker/manual entry
+- `apps/desktop/src/lib/directory-picker.ts` — runtime-aware directory picker bridge
+- `apps/orchestrator/src/utils/workspace-root.ts` — root-path validation
 
 ### Key architectural decisions:
 
 - Codex CLI agents use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` to run non-interactively
+- Each task creates a visible run tree under `<workspace.rootPath>/hivecli-runs/<task-id>`
+- Worker A and Worker B are seeded from `source/`, judge gets artifact files plus inline diff summary, implementer publishes to `<workspace.rootPath>/publish/<task-id>`
 - On Windows, `cli-adapter.ts` resolves commands explicitly instead of relying on bare PATH lookup in `node-pty`
 - Codex on Windows uses a temp prompt file with stdin redirection so multiline judge/implementer prompts survive the shell hop
 - Codex final text is sanitized to remove trailing timestamped diagnostics after the answer
@@ -167,7 +175,7 @@ The `/api/tasks/run` route now has try/catch error logging to `console.error`.
 
 ## Frontend Notes
 
-The frontend uses a full-viewport 4-panel layout designed for the Codex CLI council workflow.
+The frontend uses a full-viewport 4-panel layout designed for the Codex CLI council workflow, with a directory rail under the top bar.
 
 Current visual direction:
 
@@ -175,6 +183,7 @@ Current visual direction:
 - 2×2 grid of terminal panels with 3px gaps
 - role-specific accent colors (worker=green, judge=amber, implementer=violet)
 - minimal top bar with branding and connection status
+- workspace directory rail with validity state, current run root, and publish target
 - compact prompt bar at the bottom
 - darker, warmer palette (root background `#0e0d0c`)
 
@@ -214,9 +223,10 @@ Important safety note:
 
 ## Tests / Validation Already Run
 
-These were run successfully after the 4-panel redesign and the Codex CLI fix:
+These were run successfully after the folder-backed workflow landed:
 
-- `pnpm --filter @hive/orchestrator test` — 2/2 passed
+- `pnpm --filter @hive/orchestrator test` — 3 files / 8 tests passed
+- `pnpm test` — monorepo tests pass without live-run artifacts being collected
 - `pnpm test:ui` — Playwright smoke passes against the live 4-panel UI
 - `pnpm build` — exit code 0
 - `pnpm start` — both servers start cleanly
@@ -224,6 +234,8 @@ These were run successfully after the 4-panel redesign and the Codex CLI fix:
 - Real council run with four Codex agents completed with exit code `0` for worker A, worker B, judge, and implementer
 - Real Codex council run on Windows verified that both judge and implementer final outputs still contain the original unique token after the prompt-file fix
 - Fresh README screenshot captured from the live 4-panel UI in `docs/screenshots/swarm-live.png`
+- Folder-backed smoke flow verified in Playwright with current-run and publish paths populated in the UI
+- Manual Playwright pass confirmed invalid directory state disables Send and flips the directory rail to `Directory invalid`
 
 Verified startup behavior:
 
@@ -241,6 +253,7 @@ Verified startup behavior:
 - Codex CLI must be installed and authorized (`OPENAI_API_KEY`) for agents to produce output
 - The `cors` npm package was added as a runtime dependency to `@hive/orchestrator`
 - The shared package exports from `dist`, so after changing `packages/shared/src/*`, rebuild `@hive/shared` or run a full `pnpm build` before relying on the desktop dev server
+- The default auto-created workspace still starts at `.`; if that points at a large project, snapshot creation can be expensive until the user picks a tighter project folder
 
 ## Files Most Likely To Matter Next
 
@@ -281,4 +294,5 @@ Current remote work was being pushed incrementally to:
 - Codex CLI agents must use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` args to run non-interactively.
 - The app-store and orchestrator both patch codex agents with stale or empty args.
 - Use `pnpm test:ui` for browser automation. It runs a Playwright smoke test against the live 4-panel workflow and writes `.hivecli/playwright-smoke.png`.
+- Generated `hivecli-runs/` and `publish/` trees are intentionally excluded from Vitest discovery so old live runs do not poison the test suite.
 - For lower-cost manual/live testing on the current ChatGPT-backed Codex account, use `-c model_reasoning_effort=low`. Attempts to switch to `gpt-5-mini`, `gpt-5.4-mini`, `gpt-4.1`, and `gpt-4.1-mini` returned 400 model-not-supported errors in this environment.

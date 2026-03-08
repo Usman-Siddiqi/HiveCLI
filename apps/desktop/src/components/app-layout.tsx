@@ -1,12 +1,17 @@
 import { Settings2 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 
+import { WorkspaceDirectoryControl } from "@/components/workspace-directory-control";
 import { useAppBootstrap } from "@/hooks/use-app-bootstrap";
 import { useAppStore } from "@/stores/app-store";
 
 export function AppLayout() {
   useAppBootstrap();
   const connectionState = useAppStore((state) => state.connectionState);
+  const workspaceDetail = useAppStore((state) => state.workspaceDetail);
+  const workspaceRootStatus = useAppStore((state) => state.workspaceRootStatus);
+  const currentTaskPaths = useAppStore((state) => state.currentTaskPaths);
+  const updateWorkspaceRoot = useAppStore((state) => state.updateWorkspaceRoot);
 
   return (
     <div className="app-shell">
@@ -32,6 +37,12 @@ export function AppLayout() {
           </NavLink>
         </div>
       </div>
+      <WorkspaceDirectoryControl
+        workspaceName={workspaceDetail?.workspace.name}
+        rootStatus={workspaceRootStatus}
+        taskPaths={currentTaskPaths}
+        onUpdateRoot={updateWorkspaceRoot}
+      />
       <Outlet />
     </div>
   );

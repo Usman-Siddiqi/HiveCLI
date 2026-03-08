@@ -7,16 +7,22 @@ interface WorkerTerminalProps {
     agentName: string;
     status: string;
     content: string;
+    workingDir?: string;
 }
 
-export function WorkerTerminal({ label, agentName, status, content }: WorkerTerminalProps) {
+export function WorkerTerminal({ label, agentName, status, content, workingDir }: WorkerTerminalProps) {
     return (
         <section className="hive-panel role-worker" data-testid={`panel-${label.toLowerCase().replace(/\s+/g, "-")}`}>
             <header className="hive-panel-header">
-                <div className="flex items-center gap-2">
-                    <Cpu className="h-4 w-4 text-[var(--accent-secondary)]" />
-                    <span className="hive-panel-label">{label}</span>
-                    <span className="text-xs text-[var(--muted)]">{agentName}</span>
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                        <Cpu className="h-4 w-4 text-[var(--accent-secondary)]" />
+                        <span className="hive-panel-label">{label}</span>
+                        <span className="text-xs text-[var(--muted)]">{agentName}</span>
+                    </div>
+                    <div className="hive-panel-meta" data-testid={`path-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+                        {workingDir ?? "Waiting for assigned worker folder…"}
+                    </div>
                 </div>
                 <StatusDot status={status} label={label} />
             </header>

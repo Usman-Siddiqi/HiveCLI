@@ -4,6 +4,7 @@ import type {
   AgentDefinition,
   AgentEvent,
   AgentRun,
+  AgentRunMetadata,
   AppSettings,
   Message,
   Session,
@@ -164,7 +165,7 @@ function toAgentRun(row: AgentRunRow): AgentRun {
     exitCode: row.exitCode,
     finalText: row.finalText,
     errorText: row.errorText,
-    metadata: parseJson<Record<string, unknown> | undefined>(row.metadataJson, undefined),
+    metadata: parseJson<AgentRunMetadata | undefined>(row.metadataJson, undefined),
   };
 }
 
@@ -253,6 +254,48 @@ export class Repository {
     );
 
     return toWorkspace(row);
+  }
+
+  async updateWorkspace(workspaceId: string, input: Partial<Pick<Workspace, "name" | "rootPath">>) {
+    const current = this.get<WorkspaceRow>(
+      `
+        select
+          id,
+          name,
+          root_path as rootPath,
+          created_at as createdAt,
+          updated_at as updatedAt
+        from workspaces
+        where id = ?
+      `,
+      workspaceId,
+    );
+
+    if (!current) {
+      return undefined;
+    }
+
+    const next: WorkspaceRow = {
+      id: current.id,
+      name: input.name ?? current.name,
+      rootPath: input.rootPath ?? current.rootPath,
+      createdAt: current.createdAt,
+      updatedAt: nowIso(),
+    };
+
+    this.run(
+      `
+        update workspaces
+        set name = ?, root_path = ?, updated_at = ?
+        where id = ?
+      `,
+      next.name,
+      next.rootPath,
+      next.updatedAt,
+      workspaceId,
+    );
+
+    return toWorkspace(next);
   }
 
   async getWorkspace(workspaceId: string): Promise<WorkspaceDetail | undefined> {

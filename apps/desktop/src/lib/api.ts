@@ -10,6 +10,15 @@ import type {
 
 import { getRuntimeConfig } from "./runtime";
 
+export interface WorkspaceRootStatus {
+  rootPath: string;
+  resolvedPath?: string | null;
+  exists: boolean;
+  isDirectory: boolean;
+  valid: boolean;
+  error?: string | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const runtime = await getRuntimeConfig();
   const response = await fetch(`${runtime.orchestratorUrl}${path}`, {
@@ -31,7 +40,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  updateWorkspace: (id: string, body: Partial<Pick<Workspace, "name" | "rootPath">>) =>
+    request<Workspace>(`/api/workspaces/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
   getWorkspace: (id: string) => request<WorkspaceDetail>(`/api/workspaces/${id}`),
+  getWorkspaceRootStatus: (id: string) =>
+    request<WorkspaceRootStatus>(`/api/workspaces/${id}/root-status`),
   listSessions: (workspaceId: string) =>
     request<SessionSnapshot[]>(`/api/workspaces/${workspaceId}/sessions`),
   getSession: (id: string) => request<SessionReplay>(`/api/sessions/${id}`),

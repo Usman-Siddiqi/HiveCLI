@@ -9,6 +9,9 @@ import { useAppStore } from "@/stores/app-store";
 export function SwarmPage() {
   const {
     workspaceDetail,
+    workspaceRootStatus,
+    workspaceError,
+    currentTaskPaths,
     runOutputs,
     roles,
     connectionState,
@@ -52,6 +55,7 @@ export function SwarmPage() {
           agentName={getAgentName(roles.judge)}
           status={judge.status}
           content={judge.output}
+          workingDir={currentTaskPaths?.judgePath}
         />
 
         {/* Top-right: Implementer */}
@@ -59,6 +63,7 @@ export function SwarmPage() {
           agentName={getAgentName(roles.implementer)}
           status={implementer.status}
           content={implementer.output}
+          workingDir={currentTaskPaths?.implementerPath}
         />
 
         {/* Bottom-left: Worker A */}
@@ -67,6 +72,7 @@ export function SwarmPage() {
           agentName={getAgentName(roles.workerA)}
           status={workerA.status}
           content={workerA.output}
+          workingDir={currentTaskPaths?.workerAPath}
         />
 
         {/* Bottom-right: Worker B */}
@@ -75,12 +81,21 @@ export function SwarmPage() {
           agentName={getAgentName(roles.workerB)}
           status={workerB.status}
           content={workerB.output}
+          workingDir={currentTaskPaths?.workerBPath}
         />
       </div>
 
       <PromptBar
         onSubmit={runHiveTask}
-        disabled={connectionState !== "open"}
+        disabled={connectionState !== "open" || !workspaceRootStatus?.valid}
+        reason={
+          workspaceError ??
+          (workspaceRootStatus?.valid
+            ? currentTaskPaths?.publishDir
+              ? `Final result will be published to ${currentTaskPaths.publishDir}`
+              : "Select a task prompt to create isolated worker folders and a publish target."
+            : "Select or enter a valid project directory to enable folder-backed worker runs.")
+        }
       />
     </>
   );

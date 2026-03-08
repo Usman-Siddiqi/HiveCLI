@@ -1,4 +1,5 @@
 import os from "node:os";
+import fs from "node:fs/promises";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -21,20 +22,33 @@ describe("TaskService", () => {
       const hub = { broadcastEvent: (event: unknown) => events.push(event) } as any;
       const service = new TaskService(repository, hub);
 
+      const projectRoot = path.join(os.tmpdir(), `hivecli-project-${Date.now()}`);
+      await fs.mkdir(projectRoot, { recursive: true });
+      await fs.writeFile(path.join(projectRoot, "README.md"), "# fixture\n");
+
       const workspace = await repository.createWorkspace({
         name: "Fixture workspace",
-        rootPath: process.cwd(),
+        rootPath: projectRoot,
       });
 
       const scriptPath = path.join(process.cwd(), "tests", "fixtures", "mock-cli.mjs");
-      const makeAgent = (name: string, label: string, canJudge = false) =>
+      const makeAgent = (name: string, label: string, canJudge = false, decision?: string) =>
         repository.createAgent({
           workspaceId: workspace.id,
           name,
           type: "cli",
           provider: label,
           command: process.execPath,
-          args: [scriptPath, "--label", label, "--prompt", "{{prompt}}"],
+          args: [
+            scriptPath,
+            "--label",
+            label,
+            "--prompt",
+            "{{prompt}}",
+            "--working-dir",
+            "{{workingDir}}",
+            ...(decision ? ["--decision", decision] : []),
+          ],
           cwd: process.cwd(),
           env: {},
           enabled: true,
@@ -43,10 +57,10 @@ describe("TaskService", () => {
           model: null,
         });
 
-      const codex = await makeAgent("Codex CLI", "codex");
-      const gemini = await makeAgent("Gemini CLI", "gemini");
+      const codex = await makeAgent("Worker A", "worker-a");
+      const gemini = await makeAgent("Worker B", "worker-b");
       const judge = await makeAgent("Judge", "judge", true);
-      const implementer = await makeAgent("Implementer", "implementer");
+      const implementer = await makeAgent("Implementer", "implementer", false, "COPY_WORKER_A");
       const token = "JUDGE-TRACE-TEST";
 
       const result = await service.runTask({
@@ -73,6 +87,16 @@ describe("TaskService", () => {
           (run) => run.agentId === implementer.id && run.status === "completed" && run.finalText?.includes(token),
         ),
       ).toBe(true);
+      const runRoot = path.join(projectRoot, "hivecli-runs", result.taskId);
+      await expect(fs.stat(path.join(runRoot, "source", "README.md"))).resolves.toBeTruthy();
+      await expect(fs.stat(path.join(runRoot, "worker-a", "worker-a.txt"))).resolves.toBeTruthy();
+      await expect(fs.stat(path.join(runRoot, "worker-b", "worker-b.txt"))).resolves.toBeTruthy();
+      await expect(fs.stat(path.join(runRoot, "judge", "diff-summary.md"))).resolves.toBeTruthy();
+      await expect(fs.stat(path.join(runRoot, "implementer", "worker-a.txt"))).resolves.toBeTruthy();
+      await expect(fs.stat(path.join(projectRoot, "publish", result.taskId, "worker-a.txt"))).resolves.toBeTruthy();
+      const implementerRun = replay?.tasks[0]?.runs.find((run) => run.agentId === implementer.id);
+      expect(implementerRun?.metadata?.publishDir).toBe(path.join(projectRoot, "publish", result.taskId));
+      expect(implementerRun?.metadata?.publishSource).toBe(path.join(runRoot, "implementer"));
       expect(events.length).toBeGreaterThan(0);
     },
     20000,

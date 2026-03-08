@@ -14,3 +14,7 @@ apps/orchestrator/apps
 .playwright-cli
 output
 .hivecli
+hivecli-runs
+publish
+apps/orchestrator/hivecli-runs
+apps/orchestrator/publish

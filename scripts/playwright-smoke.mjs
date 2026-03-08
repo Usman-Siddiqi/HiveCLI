@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 const TARGET_URL = process.env.HIVECLI_UI_URL ?? "http://127.0.0.1:1420";
 const SCREENSHOT_DIR = ".hivecli";
 const SCREENSHOT_PATH = `${SCREENSHOT_DIR}/playwright-smoke.png`;
-const PROMPT = 'Reply with exactly "OK" and nothing else.';
+const PROMPT = "In your assigned folder, create a file named smoke.txt containing OK. Then summarize the change briefly.";
 const PANEL_NAMES = ["worker-a", "worker-b", "judge", "implementer"];
 
 async function readStatuses(page) {
@@ -31,6 +31,15 @@ async function main() {
   try {
     await page.goto(TARGET_URL, { waitUntil: "domcontentloaded" });
     await page.getByTestId("prompt-input").waitFor({ state: "visible" });
+    await page.getByTestId("workspace-root-path").waitFor({ state: "visible" });
+    await page.waitForFunction(
+      () => {
+        const value = document.querySelector("[data-testid='workspace-root-path']")?.textContent ?? "";
+        return value.trim().length > 0 && value.trim() !== "No directory selected";
+      },
+      undefined,
+      { timeout: 30000 },
+    );
 
     const prompt = page.getByTestId("prompt-input");
     await prompt.fill(PROMPT);
@@ -59,6 +68,15 @@ async function main() {
 
     if (!Object.values(finalStatuses).every((value) => value.includes("completed"))) {
       throw new Error(`Timed out waiting for completion: ${JSON.stringify(finalStatuses)}`);
+    }
+
+    const runPath = (await page.getByTestId("current-run-path").textContent())?.trim() ?? "";
+    const publishPath = (await page.getByTestId("publish-path").textContent())?.trim() ?? "";
+    if (!runPath || /No directory|No run/i.test(runPath)) {
+      throw new Error(`Current run path was not populated: ${runPath}`);
+    }
+    if (!publishPath || /No directory|No run/i.test(publishPath)) {
+      throw new Error(`Publish path was not populated: ${publishPath}`);
     }
 
     await page.screenshot({ path: SCREENSHOT_PATH, fullPage: true });

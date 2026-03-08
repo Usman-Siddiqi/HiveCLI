@@ -6,16 +6,22 @@ interface ImplementerPanelProps {
     agentName: string;
     status: string;
     content: string;
+    workingDir?: string;
 }
 
-export function ImplementerPanel({ agentName, status, content }: ImplementerPanelProps) {
+export function ImplementerPanel({ agentName, status, content, workingDir }: ImplementerPanelProps) {
     return (
         <section className="hive-panel role-implementer" data-testid="panel-implementer">
             <header className="hive-panel-header">
-                <div className="flex items-center gap-2">
-                    <Wrench className="h-4 w-4 text-[var(--implement)]" />
-                    <span className="hive-panel-label">Implementer</span>
-                    <span className="text-xs text-[var(--muted)]">{agentName}</span>
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                        <Wrench className="h-4 w-4 text-[var(--implement)]" />
+                        <span className="hive-panel-label">Implementer</span>
+                        <span className="text-xs text-[var(--muted)]">{agentName}</span>
+                    </div>
+                    <div className="hive-panel-meta" data-testid="path-implementer">
+                        {workingDir ?? "Waiting for publish-ready output folder…"}
+                    </div>
                 </div>
                 <StatusDot status={status} />
             </header>

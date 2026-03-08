@@ -1,8 +1,14 @@
 import express from "express";
-import { createAgentSchema, createWorkspaceSchema, runTaskInputSchema } from "@hive/shared";
+import {
+  createAgentSchema,
+  createWorkspaceSchema,
+  runTaskInputSchema,
+  updateWorkspaceSchema,
+} from "@hive/shared";
 
 import { Repository } from "../db/repository";
 import { TaskService } from "../sessions/task-service";
+import { getWorkspaceRootStatus } from "../utils/workspace-root";
 
 export function createApiRouter(repository: Repository, taskService: TaskService) {
   const router = express.Router();
@@ -20,6 +26,16 @@ export function createApiRouter(repository: Repository, taskService: TaskService
     response.status(201).json(await repository.createWorkspace(input));
   });
 
+  router.put("/api/workspaces/:workspaceId", async (request, response) => {
+    const input = updateWorkspaceSchema.parse(request.body);
+    const value = await repository.updateWorkspace(request.params.workspaceId, input);
+    if (!value) {
+      response.status(404).send("Workspace not found.");
+      return;
+    }
+    response.json(value);
+  });
+
   router.get("/api/workspaces/:workspaceId", async (request, response) => {
     const value = await repository.getWorkspace(request.params.workspaceId);
     if (!value) {
@@ -27,6 +43,15 @@ export function createApiRouter(repository: Repository, taskService: TaskService
       return;
     }
     response.json(value);
+  });
+
+  router.get("/api/workspaces/:workspaceId/root-status", async (request, response) => {
+    const workspace = await repository.getWorkspace(request.params.workspaceId);
+    if (!workspace) {
+      response.status(404).send("Workspace not found.");
+      return;
+    }
+    response.json(await getWorkspaceRootStatus(workspace.workspace.rootPath));
   });
 
   router.get("/api/workspaces/:workspaceId/sessions", async (request, response) => {

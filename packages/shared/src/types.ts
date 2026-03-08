@@ -10,6 +10,7 @@ export type AgentType = (typeof AGENT_TYPES)[number];
 export type TaskMode = (typeof TASK_MODES)[number];
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 export type AgentRunState = (typeof AGENT_RUN_STATES)[number];
+export type AgentRole = "worker" | "judge" | "implementer";
 
 export interface Workspace {
   id: string;
@@ -17,6 +18,15 @@ export interface Workspace {
   rootPath: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WorkspaceRootStatus {
+  rootPath: string;
+  resolvedPath: string | null;
+  exists: boolean;
+  isDirectory: boolean;
+  valid: boolean;
+  error?: string | null;
 }
 
 export interface AgentDefinition {
@@ -64,7 +74,7 @@ export interface AgentRun {
   exitCode?: number | null;
   finalText?: string | null;
   errorText?: string | null;
-  metadata?: Record<string, unknown>;
+  metadata?: AgentRunMetadata;
 }
 
 export interface AgentRunRequest {
@@ -72,8 +82,26 @@ export interface AgentRunRequest {
   taskId: string;
   agentId: string;
   prompt: string;
+  role: AgentRole;
   context?: string;
   workspaceRoot: string;
+  sourceDir?: string;
+  workingDir?: string;
+  runRootDir?: string;
+  publishDir?: string;
+  artifactPaths?: string[];
+}
+
+export interface AgentRunMetadata {
+  role?: AgentRole;
+  workspaceRoot?: string;
+  runRootDir?: string;
+  sourceDir?: string;
+  workingDir?: string;
+  publishDir?: string;
+  publishSource?: string | null;
+  artifactPaths?: string[];
+  warnings?: string[];
 }
 
 export interface AgentEvent {

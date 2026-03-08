@@ -20,6 +20,20 @@ export const createWorkspaceSchema = workspaceSchema.pick({
   rootPath: true,
 });
 
+export const updateWorkspaceSchema = createWorkspaceSchema.partial().refine(
+  (value) => value.name !== undefined || value.rootPath !== undefined,
+  "Expected at least one workspace field to update.",
+);
+
+export const workspaceRootStatusSchema = z.object({
+  rootPath: z.string(),
+  resolvedPath: z.string().nullable(),
+  exists: z.boolean(),
+  isDirectory: z.boolean(),
+  valid: z.boolean(),
+  error: z.string().nullable().optional(),
+});
+
 export const agentDefinitionSchema = z.object({
   id: z.string(),
   workspaceId: z.string(),
@@ -79,8 +93,14 @@ export const agentRunRequestSchema = z.object({
   taskId: z.string(),
   agentId: z.string(),
   prompt: z.string().min(1),
+  role: z.enum(["worker", "judge", "implementer"]),
   context: z.string().optional(),
   workspaceRoot: z.string().min(1),
+  sourceDir: z.string().optional(),
+  workingDir: z.string().optional(),
+  runRootDir: z.string().optional(),
+  publishDir: z.string().optional(),
+  artifactPaths: z.array(z.string()).optional(),
 });
 
 export const agentEventSchema = z.object({

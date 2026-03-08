@@ -21,10 +21,17 @@ fn get_runtime_config() -> RuntimeConfig {
     }
 }
 
+#[tauri::command]
+fn pick_directory() -> Option<String> {
+    rfd::FileDialog::new()
+        .pick_folder()
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_runtime_config])
+        .invoke_handler(tauri::generate_handler![get_runtime_config, pick_directory])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

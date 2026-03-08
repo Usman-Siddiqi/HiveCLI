@@ -15,7 +15,11 @@ function interpolateValue(value: string, request: AgentRunRequest) {
     .replaceAll("{{prompt}}", request.prompt)
     .replaceAll("{{sessionId}}", request.sessionId)
     .replaceAll("{{taskId}}", request.taskId)
-    .replaceAll("{{workspaceRoot}}", request.workspaceRoot);
+    .replaceAll("{{workspaceRoot}}", request.workspaceRoot)
+    .replaceAll("{{sourceDir}}", request.sourceDir ?? "")
+    .replaceAll("{{workingDir}}", request.workingDir ?? "")
+    .replaceAll("{{runRootDir}}", request.runRootDir ?? "")
+    .replaceAll("{{publishDir}}", request.publishDir ?? "");
 }
 
 function interpolateArgs(args: string[] | undefined, request: AgentRunRequest) {
@@ -113,6 +117,8 @@ export class CliAgentAdapter implements AgentAdapter {
 
     handlers.onStatus("running");
 
+    const effectiveCwd = request.workingDir || agent.cwd || request.workspaceRoot;
+
     // On Windows, node-pty cannot resolve PATH on its own, so we spawn
     // through a resolved executable path when possible. Codex uses a
     // temp prompt file + stdin redirection to preserve multiline prompts.
@@ -125,7 +131,7 @@ export class CliAgentAdapter implements AgentAdapter {
     let spawnArgs = args;
 
     if (isWindows) {
-      const resolvedCommand = resolveWindowsCommand(command, agent.cwd || request.workspaceRoot, runtimeEnv);
+      const resolvedCommand = resolveWindowsCommand(command, effectiveCwd, runtimeEnv);
       const resolvedExtension = path.extname(resolvedCommand).toLowerCase();
       const shouldSpawnDirectly =
         [".exe", ".com"].includes(resolvedExtension) ||
@@ -147,7 +153,7 @@ export class CliAgentAdapter implements AgentAdapter {
       name: "xterm-color",
       cols: 120,
       rows: 40,
-      cwd: agent.cwd || request.workspaceRoot,
+      cwd: effectiveCwd,
       env: runtimeEnv,
     });
 
