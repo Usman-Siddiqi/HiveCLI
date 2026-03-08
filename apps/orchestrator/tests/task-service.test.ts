@@ -47,10 +47,11 @@ describe("TaskService", () => {
       const gemini = await makeAgent("Gemini CLI", "gemini");
       const judge = await makeAgent("Judge", "judge", true);
       const implementer = await makeAgent("Implementer", "implementer");
+      const token = "JUDGE-TRACE-TEST";
 
       const result = await service.runTask({
         workspaceId: workspace.id,
-        prompt: "ship it",
+        prompt: `Return exactly ${token}`,
         mode: "council",
         agentIds: [codex.id, gemini.id, judge.id, implementer.id],
         judgeAgentId: judge.id,
@@ -62,6 +63,16 @@ describe("TaskService", () => {
       expect(replay?.tasks[0]?.runs.map((run) => run.agentId).sort()).toEqual(
         [codex.id, gemini.id, judge.id, implementer.id].sort(),
       );
+      expect(
+        replay?.tasks[0]?.runs.some(
+          (run) => run.agentId === judge.id && run.status === "completed" && run.finalText?.includes(token),
+        ),
+      ).toBe(true);
+      expect(
+        replay?.tasks[0]?.runs.some(
+          (run) => run.agentId === implementer.id && run.status === "completed" && run.finalText?.includes(token),
+        ),
+      ).toBe(true);
       expect(events.length).toBeGreaterThan(0);
     },
     20000,

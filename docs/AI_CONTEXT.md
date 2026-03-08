@@ -79,7 +79,8 @@ BEFORE:                               AFTER:
 ### Key architectural decisions:
 
 - Codex CLI agents use `exec --full-auto "{{prompt}}"` to run non-interactively
-- On Windows, `node-pty` cannot resolve PATH, so `cli-adapter.ts` spawns through `cmd.exe /c`
+- On Windows, `cli-adapter.ts` resolves commands explicitly instead of relying on bare PATH lookup in `node-pty`
+- Codex on Windows uses a temp prompt file with stdin redirection so multiline judge/implementer prompts survive the shell hop
 - The app-store auto-patches existing codex agents with empty args on workspace load
 - The implementer agent is identified by name convention (`"implementer"` in agent name)
 - Judge → Implementer handoff uses `buildImplementerPrompt()` from `@hive/shared`
@@ -220,6 +221,7 @@ These were run successfully after the 4-panel redesign and the Codex CLI fix:
 - `pnpm start` — both servers start cleanly
 - Direct API test: `POST /api/tasks/run` with real agent IDs returns `sessionId`/`taskId`
 - Real council run with four Codex agents completed with exit code `0` for worker A, worker B, judge, and implementer
+- Real Codex council run on Windows verified that both judge and implementer final outputs still contain the original unique token after the prompt-file fix
 
 Verified startup behavior:
 
@@ -277,3 +279,4 @@ Current remote work was being pushed incrementally to:
 - Codex CLI agents must use `exec --full-auto "{{prompt}}"` args to run non-interactively.
 - The app-store and orchestrator both patch codex agents with stale or empty args.
 - Use `pnpm test:ui` for browser automation. It runs a Playwright smoke test against the live 4-panel workflow and writes `.hivecli/playwright-smoke.png`.
+- For lower-cost manual/live testing on the current ChatGPT-backed Codex account, use `-c model_reasoning_effort=low`. Attempts to switch to `gpt-5-mini`, `gpt-5.4-mini`, `gpt-4.1`, and `gpt-4.1-mini` returned 400 model-not-supported errors in this environment.
