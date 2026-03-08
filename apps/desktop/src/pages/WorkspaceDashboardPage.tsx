@@ -36,7 +36,7 @@ export function WorkspaceDashboardPage() {
             <span className="mb-2 block text-sm text-slate-400">Root path</span>
             <Input
               onChange={(event) => setRootPath(event.target.value)}
-              placeholder={"C:\\Users\\usman\\Documents\\Code\\project"}
+              placeholder={"C:\\Users\\your-name\\Documents\\Code\\project"}
               value={rootPath}
             />
           </label>
