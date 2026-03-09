@@ -25,6 +25,7 @@ export const AGENT_RUN_STATES = [
 export const CODEX_CLI_ARGS = [
   "exec",
   "--full-auto",
+  "--skip-git-repo-check",
   "-m",
   "gpt-5.1-codex-mini",
   "-c",
@@ -33,6 +34,15 @@ export const CODEX_CLI_ARGS = [
 ] as const;
 
 export const LEGACY_CODEX_CLI_ARGS = ["--approval-mode", "full-auto", "-q", "{{prompt}}"] as const;
+export const PRE_TRUST_BYPASS_CODEX_CLI_ARGS = [
+  "exec",
+  "--full-auto",
+  "-m",
+  "gpt-5.1-codex-mini",
+  "-c",
+  "model_reasoning_effort=medium",
+  "{{prompt}}",
+] as const;
 
 export function isLegacyCodexCliArgs(args: string[] | undefined) {
   if (!args || args.length !== LEGACY_CODEX_CLI_ARGS.length) {
@@ -42,8 +52,16 @@ export function isLegacyCodexCliArgs(args: string[] | undefined) {
   return LEGACY_CODEX_CLI_ARGS.every((value, index) => args[index] === value);
 }
 
+export function isPreTrustBypassCodexCliArgs(args: string[] | undefined) {
+  if (!args || args.length !== PRE_TRUST_BYPASS_CODEX_CLI_ARGS.length) {
+    return false;
+  }
+
+  return PRE_TRUST_BYPASS_CODEX_CLI_ARGS.every((value, index) => args[index] === value);
+}
+
 export function shouldMigrateCodexCliArgs(args: string[] | undefined) {
-  return !args || args.length === 0 || isLegacyCodexCliArgs(args);
+  return !args || args.length === 0 || isLegacyCodexCliArgs(args) || isPreTrustBypassCodexCliArgs(args);
 }
 
 export const BUILTIN_AGENT_TEMPLATES = [

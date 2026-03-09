@@ -139,7 +139,7 @@ The original selected project directory is treated as source material and is not
 Current Codex default:
 
 ```text
-codex exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"
+codex exec --full-auto --skip-git-repo-check -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"
 ```
 
 ## Persistence

@@ -70,7 +70,7 @@ BEFORE:                               AFTER:
 - `apps/orchestrator/src/index.ts` — added `cors` middleware
 - `apps/orchestrator/src/routes/api.ts` — added error logging to `/api/tasks/run`
 - `apps/orchestrator/vitest.config.ts` — excludes generated `hivecli-runs/` and `publish/` trees from test discovery
-- `packages/shared/src/constants.ts` — codex template args updated to `["exec", "--full-auto", "-m", "gpt-5.1-codex-mini", "-c", "model_reasoning_effort=medium", "{{prompt}}"]`
+- `packages/shared/src/constants.ts` — codex template args updated to `["exec", "--full-auto", "--skip-git-repo-check", "-m", "gpt-5.1-codex-mini", "-c", "model_reasoning_effort=medium", "{{prompt}}"]`
 
 ### Files created:
 
@@ -84,7 +84,7 @@ BEFORE:                               AFTER:
 
 ### Key architectural decisions:
 
-- Codex CLI agents use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` to run non-interactively
+- Codex CLI agents use `exec --full-auto --skip-git-repo-check -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` to run non-interactively inside the isolated worker folders
 - Each task creates a visible run tree under `<workspace.rootPath>/hivecli-runs/<task-id>`
 - Worker A and Worker B are seeded from `source/`, judge gets artifact files plus inline diff summary, implementer publishes to `<workspace.rootPath>/publish/<task-id>`
 - On Windows, `cli-adapter.ts` resolves commands explicitly instead of relying on bare PATH lookup in `node-pty`
@@ -291,7 +291,7 @@ Current remote work was being pushed incrementally to:
 - If touching startup, keep `pnpm start` idempotent.
 - If touching tests around PTY on Windows, prefer `process.execPath` over hardcoded `node`.
 - On Windows, always spawn CLI agents through `cmd.exe /c` in `node-pty` for PATH resolution.
-- Codex CLI agents must use `exec --full-auto -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` args to run non-interactively.
+- Codex CLI agents must use `exec --full-auto --skip-git-repo-check -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"` args to run non-interactively in the folder-backed workflow.
 - The app-store and orchestrator both patch codex agents with stale or empty args.
 - Use `pnpm test:ui` for browser automation. It runs a Playwright smoke test against the live 4-panel workflow and writes `.hivecli/playwright-smoke.png`.
 - Generated `hivecli-runs/` and `publish/` trees are intentionally excluded from Vitest discovery so old live runs do not poison the test suite.
