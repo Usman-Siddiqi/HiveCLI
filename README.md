@@ -1,41 +1,77 @@
-# HiveCLI
+# HiveCLI — Local Multi-Agent AI Orchestrator for CLI Workflows
 
-HiveCLI is a local-first desktop workspace for running multiple CLI-backed agents in parallel, watching their output live, and chaining them through a folder-backed council flow.
+> Run multiple AI coding agents in parallel, compare their outputs side-by-side, and automatically merge the best result — all from a local-first desktop app powered by Tauri and Node.js.
 
-The current MVP is optimized for a 4-panel Codex CLI workflow:
+[![Node.js](https://img.shields.io/badge/Node.js-22--25-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tauri](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=white)](https://tauri.app/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev/)
+[![pnpm](https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
 
-- Worker A
-- Worker B
-- Judge
-- Implementer
+---
+
+## Table of Contents
+
+- [What Is HiveCLI?](#what-is-hivecli)
+- [Screenshot](#screenshot)
+- [Key Features](#key-features)
+- [Tech Stack](#tech-stack)
+- [Monorepo Layout](#monorepo-layout)
+- [Getting Started](#getting-started)
+- [Testing](#testing)
+- [Folder-Based Agent Workflow](#folder-based-agent-workflow)
+- [Built-In Agent Templates](#built-in-agent-templates)
+- [Local Persistence](#local-persistence)
+- [Current Caveats](#current-caveats)
+- [Roadmap](#roadmap)
+- [License](#license)
+
+---
+
+## What Is HiveCLI?
+
+HiveCLI is a **local-first desktop workspace** for running multiple **CLI-backed AI agents** in parallel, watching their output live, and chaining them through a **folder-backed council flow**. It is designed for developers who want to orchestrate AI coding assistants like OpenAI Codex CLI, Gemini CLI, or any custom command-line tool — without sending data to external servers.
+
+The current MVP is optimized for a **4-panel Codex CLI council workflow**:
+
+| Panel | Role |
+|-------|------|
+| **Worker A** | Generates a candidate solution from an isolated project snapshot |
+| **Worker B** | Generates an independent alternative solution in parallel |
+| **Judge** | Compares both outputs and selects the best approach |
+| **Implementer** | Applies the judge's verdict and publishes the final result |
 
 The app fans one prompt out to the workers, seeds each worker from an isolated project snapshot, asks the judge to compare both responses and both folders, then passes that verdict into the implementer for the final published result.
 
 ## Screenshot
 
-![HiveCLI live swarm run](docs/screenshots/swarm-live.png)
+![HiveCLI multi-agent AI orchestrator showing live 4-panel terminal workspace with Worker A, Worker B, Judge, and Implementer panels running Codex CLI agents in parallel](docs/screenshots/swarm-live.png)
 
-## What Works Today
+## Key Features
 
-- One-command local startup with `pnpm start`
-- Workspace-level project directory selection
-- Live multi-agent streaming over WebSockets
-- PTY-backed CLI agents via `node-pty`
-- Saved sessions and replay from local SQLite
-- Codex CLI templates with automatic migration for older agent configs
-- Folder-backed council pipeline: workers -> judge -> implementer -> publish
-- Settings page for local provider and workspace defaults
+- **One-command startup** — `pnpm start` launches the full stack locally
+- **Parallel multi-agent execution** — run two or more AI CLI agents side-by-side with live streaming
+- **Real-time terminal output** — WebSocket-powered live streaming via xterm.js
+- **Council pipeline** — automated Workers → Judge → Implementer flow for AI-assisted code generation
+- **Folder-backed isolation** — each agent works in its own snapshot directory, keeping your source safe
+- **PTY-backed CLI agents** — full terminal emulation via `node-pty` for any command-line tool
+- **Session history and replay** — saved sessions in local SQLite for reviewing past runs
+- **Built-in agent templates** — preconfigured support for Codex CLI, Gemini CLI, and custom commands
+- **Local-first and private** — no cloud dependency; all data stays on your machine
+- **Workspace-level project directory selection** — point HiveCLI at any local project folder
 
-## Stack
+## Tech Stack
 
-- Desktop shell: Tauri 2
-- Frontend: React, TypeScript, Vite, Tailwind CSS
-- Runtime state: Zustand + React Query
-- Terminal rendering: xterm.js
-- Orchestrator: Node.js, TypeScript, Express, WebSockets
-- Process runtime: node-pty
-- Persistence: SQLite via Node `node:sqlite`
-- Shared contracts: Zod + `packages/shared`
+| Layer | Technology |
+|-------|-----------|
+| Desktop shell | [Tauri 2](https://tauri.app/) |
+| Frontend | [React](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vite.dev/), [Tailwind CSS](https://tailwindcss.com/) |
+| Runtime state | [Zustand](https://github.com/pmndrs/zustand) + [React Query](https://tanstack.com/query) |
+| Terminal rendering | [xterm.js](https://xtermjs.org/) |
+| Orchestrator | [Node.js](https://nodejs.org/), TypeScript, [Express](https://expressjs.com/), WebSockets |
+| Process runtime | [node-pty](https://github.com/nicedoc/node-pty) |
+| Persistence | SQLite via Node built-in `node:sqlite` |
+| Shared contracts | [Zod](https://zod.dev/) + `packages/shared` |
 
 ## Monorepo Layout
 
@@ -53,11 +89,11 @@ docs/
 
 ### Requirements
 
-- Node 22 to 25
-- pnpm 10+
+- **Node.js** 22 to 25
+- **pnpm** 10+
 - Windows-first environment for the current MVP
 - Rust only if you want to run the Tauri shell directly
-- Installed and authorized CLI backends such as `codex`
+- Installed and authorized CLI backends such as [Codex CLI](https://github.com/openai/codex)
 
 ### Install
 
@@ -109,9 +145,9 @@ pnpm build
 
 `pnpm test:ui` runs the Playwright smoke flow against the live app.
 
-## Folder Workflow
+## Folder-Based Agent Workflow
 
-For each task run, HiveCLI creates:
+For each task run, HiveCLI creates an isolated directory tree:
 
 ```text
 <project-dir>/hivecli-runs/<task-id>/
@@ -132,9 +168,9 @@ The original selected project directory is treated as source material and is not
 
 ## Built-In Agent Templates
 
-- `Codex CLI`
-- `Gemini CLI`
-- `Custom CLI`
+- **Codex CLI** — OpenAI's coding agent
+- **Gemini CLI** — Google's AI assistant
+- **Custom CLI** — any command-line tool you want to orchestrate
 
 Current Codex default:
 
@@ -142,7 +178,7 @@ Current Codex default:
 codex exec --full-auto --skip-git-repo-check -m gpt-5.1-codex-mini -c model_reasoning_effort=medium "{{prompt}}"
 ```
 
-## Persistence
+## Local Persistence
 
 Default local database path:
 
@@ -150,7 +186,7 @@ Default local database path:
 apps/orchestrator/data/hivecli.db
 ```
 
-Tracked repo files do not include the local database, runtime logs, or saved local session artifacts.
+All data is stored locally. Tracked repo files do not include the local database, runtime logs, or saved session artifacts.
 
 ## Current Caveats
 
@@ -162,11 +198,12 @@ Tracked repo files do not include the local database, runtime logs, or saved loc
 
 ## Roadmap
 
-- Direct API-backed LLM adapters
+- Direct API-backed LLM adapters (OpenAI, Anthropic, Google Gemini)
 - Tauri-bundled orchestrator startup
 - Layout persistence and drag/drop panel management
 - Safer approval gates for risky CLI actions
 - Git-aware workflows and richer task chaining
+- Cross-platform support (macOS, Linux)
 
 ## License
 
