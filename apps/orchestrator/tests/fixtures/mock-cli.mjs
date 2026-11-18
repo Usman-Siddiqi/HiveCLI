@@ -43,5 +43,5 @@ setTimeout(async () => {
     process.stdout.write(`[${label}] done\n`);
   }
 
-  process.exit(0);
+  process.exit(Number(getArg("--exit-code") ?? "0"));
 }, delay * 2);

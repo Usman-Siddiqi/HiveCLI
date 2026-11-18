@@ -17,10 +17,12 @@ export function TerminalPane({ output }: { output: string }) {
       convertEol: true,
       fontFamily: "IBM Plex Mono, Consolas, monospace",
       fontSize: 12,
+      disableStdin: true,
+      scrollback: 3000,
       theme: {
-        background: "#0f0e0c",
-        foreground: "#ede4d8",
-        cursor: "#c48b3b",
+        background: "#202821",
+        foreground: "#e5e8da",
+        cursor: "#e8b964",
       },
     });
     const fitAddon = new FitAddon();
@@ -55,7 +57,7 @@ export function TerminalPane({ output }: { output: string }) {
     }
 
     if (!output.startsWith(lastValueRef.current)) {
-      terminal.clear();
+      terminal.reset();
       terminal.write(output);
       lastValueRef.current = output;
       return;
@@ -69,6 +71,6 @@ export function TerminalPane({ output }: { output: string }) {
   }, [output]);
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-hidden bg-[#0f0e0c]" />
+    <div ref={containerRef} className="h-full w-full overflow-hidden bg-[#202821]" />
   );
 }

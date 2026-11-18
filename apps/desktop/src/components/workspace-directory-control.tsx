@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, FolderTree, PencilLine, Sparkles, Target, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+import { FolderGit2, Pencil } from "lucide-react";
 
 import type { WorkspaceRootStatus } from "@/lib/api";
-import type { CurrentTaskPaths } from "@/stores/app-store";
 import { pickDirectory } from "@/lib/directory-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,205 +10,102 @@ import { Modal } from "@/components/ui/dialog";
 interface WorkspaceDirectoryControlProps {
   workspaceName?: string;
   rootStatus?: WorkspaceRootStatus;
-  taskPaths?: CurrentTaskPaths;
   onUpdateRoot: (rootPath: string) => Promise<void>;
-}
-
-function compactPath(value?: string | null) {
-  if (!value) {
-    return "No directory selected";
-  }
-
-  return value.length > 96 ? `...${value.slice(-93)}` : value;
+  disabled?: boolean;
 }
 
 export function WorkspaceDirectoryControl({
   workspaceName,
   rootStatus,
-  taskPaths,
   onUpdateRoot,
+  disabled,
 }: WorkspaceDirectoryControlProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [manualPath, setManualPath] = useState(rootStatus?.rootPath ?? "");
+  const [manualPath, setManualPath] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+  const path = rootStatus?.resolvedPath ?? rootStatus?.rootPath;
 
-  useEffect(() => {
+  function openEditor() {
     setManualPath(rootStatus?.rootPath ?? "");
-  }, [rootStatus?.rootPath]);
-
-  const rootValid = rootStatus?.valid ?? false;
-  const resolvedPath = rootStatus?.resolvedPath ?? rootStatus?.rootPath ?? "";
-  const projectLabel = rootValid ? "Ready for folder-backed runs" : "Select a valid project directory";
-  const runRoot = taskPaths?.runRootDir;
-  const sourceDir = taskPaths?.sourceDir;
-  const publishDir = taskPaths?.publishDir;
-  const publishSource = taskPaths?.publishSource;
-  const artifactCount = taskPaths?.artifactPaths?.length ?? 0;
-
-  const statusTone = useMemo(
-    () =>
-      rootValid
-        ? {
-            icon: CheckCircle2,
-            className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/25",
-            label: "Directory ready",
-          }
-        : {
-            icon: TriangleAlert,
-            className: "bg-amber-500/10 text-amber-200 border-amber-500/20",
-            label: rootStatus?.rootPath ? "Directory invalid" : "Directory missing",
-          },
-    [rootStatus?.rootPath, rootValid],
-  );
-
-  async function handleDesktopPick() {
-    const selected = await pickDirectory();
-    if (!selected) {
-      setDialogOpen(true);
-      return;
-    }
-
-    setManualPath(selected);
-    setSaving(true);
-    try {
-      await onUpdateRoot(selected);
-    } finally {
-      setSaving(false);
-    }
+    setError(undefined);
+    setDialogOpen(true);
   }
 
-  async function handleManualSave() {
+  async function handleSave(event: React.FormEvent) {
+    event.preventDefault();
     const nextPath = manualPath.trim();
-    if (!nextPath) {
-      return;
-    }
+    if (!nextPath || saving) return;
 
     setSaving(true);
+    setError(undefined);
     try {
       await onUpdateRoot(nextPath);
       setDialogOpen(false);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Could not save the project directory.");
     } finally {
       setSaving(false);
     }
   }
 
-  const StatusIcon = statusTone.icon;
-
   return (
     <>
-      <div className="workspace-rail">
-        <div className="workspace-rail-card workspace-rail-card-primary">
-          <div className="workspace-rail-heading">
-            <div className="workspace-rail-icon">
-              <FolderTree className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="workspace-rail-label">Project Directory</div>
-              <div className="workspace-rail-caption">
-                {workspaceName ?? "Workspace"} · {projectLabel}
-              </div>
-            </div>
-          </div>
-
-          <div className="workspace-rail-path" data-testid="workspace-root-path">
-            {compactPath(resolvedPath)}
-          </div>
-
-          <div className={`workspace-rail-status ${statusTone.className}`}>
-            <StatusIcon className="h-3.5 w-3.5" />
-            <span>{statusTone.label}</span>
-          </div>
-
-          <div className="workspace-rail-actions">
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void handleDesktopPick()}
-              disabled={saving}
-            >
-              <FolderTree className="h-3.5 w-3.5" />
-              {rootStatus?.rootPath ? "Change Directory" : "Select Directory"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => setDialogOpen(true)}
-              disabled={saving}
-            >
-              <PencilLine className="h-3.5 w-3.5" />
-              Enter Path
-            </Button>
-          </div>
-        </div>
-
-        <div className="workspace-rail-card">
-          <div className="workspace-rail-heading">
-            <div className="workspace-rail-icon workspace-rail-icon-run">
-              <Sparkles className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="workspace-rail-label">Current Run</div>
-              <div className="workspace-rail-caption">Fresh worker, judge, and implementer folders</div>
-            </div>
-          </div>
-          <div className="workspace-rail-path" data-testid="current-run-path">
-            {compactPath(runRoot)}
-          </div>
-          <div className="workspace-rail-caption workspace-rail-caption-secondary">
-            Source snapshot: {compactPath(sourceDir)}
-          </div>
-        </div>
-
-        <div className="workspace-rail-card">
-          <div className="workspace-rail-heading">
-            <div className="workspace-rail-icon workspace-rail-icon-publish">
-              <Target className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="workspace-rail-label">Publish Target</div>
-              <div className="workspace-rail-caption">Where the final accepted result will be copied</div>
-            </div>
-          </div>
-          <div className="workspace-rail-path" data-testid="publish-path">
-            {compactPath(publishDir)}
-          </div>
-          <div className="workspace-rail-caption workspace-rail-caption-secondary">
-            Publish source: {compactPath(publishSource)}{artifactCount > 0 ? ` · ${artifactCount} artifacts` : ""}
-          </div>
-        </div>
-      </div>
+      <button
+        type="button"
+        className="project-picker"
+        onClick={openEditor}
+        disabled={disabled}
+        aria-label="Change project directory"
+      >
+        <span className="project-icon"><FolderGit2 size={18} aria-hidden="true" /></span>
+        <span className="project-name">
+          <strong>{workspaceName ?? "Project directory"}</strong>
+          <span data-testid="workspace-root-path" title={path}>{path || "No directory selected"}</span>
+        </span>
+        <Pencil size={13} aria-hidden="true" />
+      </button>
 
       <Modal
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        title="Set project directory"
-        description="Desktop mode uses the native picker. In browser/dev mode, paste the absolute path you want this workspace to use."
+        onOpenChange={(open) => { if (!saving) setDialogOpen(open); }}
+        title="Project directory"
+        description="Choose the folder HiveCLI should copy into each run."
       >
-        <div className="space-y-4">
-          <label className="block text-sm">
-            <div className="mb-2 text-[var(--muted)]">Absolute project path</div>
+        <form onSubmit={handleSave}>
+          <label className="form-field">
+            <span>Directory path</span>
             <Input
               value={manualPath}
               onChange={(event) => setManualPath(event.target.value)}
-              placeholder="C:\\Users\\your-name\\Documents\\Code\\project"
+              placeholder="/path/to/project"
+              autoComplete="off"
+              spellCheck={false}
+              required
             />
           </label>
-
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-strong)] p-4 text-sm text-[var(--muted)]">
-            The orchestrator will validate the path and only enable the run button when it exists and
-            is a directory.
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => setDialogOpen(false)}>
+          {error ? <p className="form-error" role="alert">{error}</p> : null}
+          <div className="form-actions">
+            {"__TAURI_INTERNALS__" in window ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  const selected = await pickDirectory();
+                  if (selected) setManualPath(selected);
+                }}
+              >
+                Browse
+              </Button>
+            ) : null}
+            <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="button" onClick={() => void handleManualSave()} disabled={saving || !manualPath.trim()}>
-              Save Directory
+            <Button type="submit" disabled={saving || !manualPath.trim()}>
+              {saving ? "Saving…" : "Save directory"}
             </Button>
           </div>
-        </div>
+        </form>
       </Modal>
     </>
   );

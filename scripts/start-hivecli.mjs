@@ -1,137 +1,83 @@
-import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
+import {
+  createLocalServices,
+  ensureSharedBuild,
+  isFrontend,
+  isOrchestrator,
+  processFailure,
+  waitUntilReady,
+} from "./local-services.mjs";
 
-const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-const orchestratorHealthUrl = "http://127.0.0.1:45231/health";
-const desktopUrl = "http://127.0.0.1:1420";
+const services = createLocalServices();
 const useTauri = process.argv.includes("--tauri");
-const children = [];
-
-function prefixStream(stream, prefix) {
-  let buffer = "";
-
-  stream.setEncoding("utf8");
-  stream.on("data", (chunk) => {
-    buffer += chunk;
-    const lines = buffer.split(/\r?\n/);
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        continue;
-      }
-      console.log(`[${prefix}] ${line}`);
-    }
-  });
-
-  stream.on("end", () => {
-    if (buffer.trim()) {
-      console.log(`[${prefix}] ${buffer}`);
-    }
-  });
-}
-
-function spawnPnpm(label, args) {
-  const child =
-    process.platform === "win32"
-      ? spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `pnpm ${args.join(" ")}`], {
-          cwd: repoRoot,
-          env: process.env,
-          stdio: ["ignore", "pipe", "pipe"],
-          windowsHide: false,
-        })
-      : spawn("pnpm", args, {
-          cwd: repoRoot,
-          env: process.env,
-          stdio: ["ignore", "pipe", "pipe"],
-          windowsHide: false,
-        });
-
-  prefixStream(child.stdout, label);
-  prefixStream(child.stderr, `${label}:err`);
-  children.push(child);
-  return child;
-}
-
-async function isHealthy(url) {
-  try {
-    const response = await fetch(url);
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function waitForHealth(url, processLabel, child, timeoutMs = 30000) {
-  const start = Date.now();
-
-  while (Date.now() - start < timeoutMs) {
-    if (await isHealthy(url)) {
-      return;
-    }
-
-    if (child.exitCode !== null) {
-      throw new Error(`${processLabel} exited early with code ${child.exitCode}.`);
-    }
-
-    await delay(750);
-  }
-
-  throw new Error(`Timed out waiting for ${processLabel} to become ready on ${url}.`);
-}
+const desktopUrl = "http://127.0.0.1:1420";
 
 async function main() {
-  if (await isHealthy(orchestratorHealthUrl)) {
-    console.log("HiveCLI orchestrator already running on 127.0.0.1:45231");
+  const port = Number(process.env.HIVECLI_PORT ?? 45231);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("HIVECLI_PORT must be an integer between 1 and 65535.");
+  }
+
+  const configuredHost = process.env.HIVECLI_HOST || "127.0.0.1";
+  const host = configuredHost === "::" ? "::1" : configuredHost === "0.0.0.0" ? "127.0.0.1" : configuredHost;
+  const address = host.includes(":") ? `[${host}]` : host;
+  const orchestratorUrl = `http://${address}:${port}`;
+  const runtimeEnv = {
+    VITE_ORCHESTRATOR_URL: process.env.VITE_ORCHESTRATOR_URL ?? orchestratorUrl,
+    VITE_ORCHESTRATOR_WS_URL: process.env.VITE_ORCHESTRATOR_WS_URL ?? `ws://${address}:${port}/ws`,
+  };
+
+  await ensureSharedBuild(services);
+  const running = [];
+  if (await isOrchestrator(orchestratorUrl)) {
+    console.log(`HiveCLI orchestrator is already running at ${orchestratorUrl}.`);
   } else {
-    console.log("Starting HiveCLI orchestrator...");
-    const orchestrator = spawnPnpm("orchestrator", ["--filter", "@hive/orchestrator", "dev"]);
-    await waitForHealth(orchestratorHealthUrl, "orchestrator", orchestrator);
+    const orchestrator = services.start("Orchestrator", ["--filter", "@hive/orchestrator", "dev"]);
+    await waitUntilReady(orchestrator, orchestratorUrl, isOrchestrator);
+    running.push(orchestrator);
   }
 
   if (useTauri) {
-    console.log("Starting HiveCLI desktop shell...");
-    const desktop = spawnPnpm("desktop", ["--filter", "@hive/desktop", "dev:tauri"]);
-    desktop.on("exit", (code) => {
-      process.exit(code ?? 0);
-    });
-    return;
+    running.push(services.start("Tauri shell", ["--filter", "@hive/desktop", "dev:tauri"], {
+      ...runtimeEnv,
+      HIVECLI_ORCHESTRATOR_URL: process.env.HIVECLI_ORCHESTRATOR_URL ?? runtimeEnv.VITE_ORCHESTRATOR_URL,
+      HIVECLI_ORCHESTRATOR_WS_URL: process.env.HIVECLI_ORCHESTRATOR_WS_URL ?? runtimeEnv.VITE_ORCHESTRATOR_WS_URL,
+    }));
+  } else if (await isFrontend(desktopUrl)) {
+    console.log(`HiveCLI frontend is already running at ${desktopUrl}.`);
+  } else {
+    const frontend = services.start("Frontend", ["--filter", "@hive/desktop", "dev"], runtimeEnv);
+    await waitUntilReady(frontend, desktopUrl, isFrontend);
+    running.push(frontend);
   }
 
-  if (await isHealthy(desktopUrl)) {
-    console.log("HiveCLI frontend already running on http://localhost:1420");
-    return;
-  }
-
-  console.log("Starting HiveCLI frontend at http://localhost:1420 ...");
-  const desktop = spawnPnpm("desktop", ["--filter", "@hive/desktop", "dev"]);
-  await waitForHealth(desktopUrl, "frontend", desktop);
-  desktop.on("exit", (code) => {
-    process.exit(code ?? 0);
-  });
-}
-
-function shutdown(signal) {
-  for (const child of children) {
-    if (child.exitCode === null) {
-      child.kill(signal);
-    }
+  if (running.length === 0) return;
+  const { service, result } = await Promise.race(
+    running.map((service) => service.done.then((result) => ({ service, result }))),
+  );
+  if (service.label !== "Tauri shell" || result.code !== 0) {
+    throw processFailure(service, result);
   }
 }
 
-process.on("SIGINT", () => {
-  shutdown("SIGINT");
-  process.exit(130);
-});
+let stopping = false;
+async function stopOnSignal(exitCode) {
+  if (stopping) return;
+  stopping = true;
+  await services.stop();
+  process.exit(exitCode);
+}
 
-process.on("SIGTERM", () => {
-  shutdown("SIGTERM");
-  process.exit(143);
-});
+for (const [signal, code] of [["SIGHUP", 129], ["SIGINT", 130], ["SIGTERM", 143]]) {
+  process.on(signal, () => void stopOnSignal(code));
+}
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  shutdown("SIGTERM");
-  process.exit(1);
-});
+try {
+  await main();
+} catch (error) {
+  if (!stopping) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  }
+} finally {
+  if (!stopping) await services.stop();
+}

@@ -1,49 +1,87 @@
-import { Settings2 } from "lucide-react";
-import { NavLink, Outlet } from "react-router-dom";
+import { ChevronRight, GitFork, History, Hexagon, SlidersHorizontal } from "lucide-react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { WorkspaceDirectoryControl } from "@/components/workspace-directory-control";
 import { useAppBootstrap } from "@/hooks/use-app-bootstrap";
 import { useAppStore } from "@/stores/app-store";
 
+const navigation = [
+  { to: "/", label: "Council", icon: GitFork },
+  { to: "/history", label: "Run history", icon: History },
+  { to: "/settings", label: "Agents", icon: SlidersHorizontal },
+];
+
 export function AppLayout() {
   useAppBootstrap();
+  const { pathname } = useLocation();
   const connectionState = useAppStore((state) => state.connectionState);
   const workspaceDetail = useAppStore((state) => state.workspaceDetail);
   const workspaceRootStatus = useAppStore((state) => state.workspaceRootStatus);
-  const currentTaskPaths = useAppStore((state) => state.currentTaskPaths);
   const updateWorkspaceRoot = useAppStore((state) => state.updateWorkspaceRoot);
+  const bootError = useAppStore((state) => state.bootError);
+  const boot = useAppStore((state) => state.boot);
+  const runningTask = useAppStore((state) => state.runningTask);
+  const page = navigation.find(({ to }) => pathname === to)?.label ?? "Council";
+  const connectionLabel = {
+    idle: "Starting",
+    connecting: "Connecting",
+    open: "Connected",
+    closed: "Disconnected",
+  }[connectionState];
 
   return (
     <div className="app-shell">
-      <div className="app-topbar">
-        <div className="app-topbar-brand">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          HiveCLI
-        </div>
-        <div className="app-topbar-status">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${connectionState === "open"
-                ? "bg-emerald-500"
-                : connectionState === "connecting"
-                  ? "bg-amber-400 animate-pulse"
-                  : "bg-zinc-600"
-              }`}
-          />
-          <span className="capitalize">{connectionState}</span>
-          <NavLink to="/settings" className="ml-4 text-[var(--muted)] transition hover:text-[var(--text)]">
-            <Settings2 className="h-4 w-4" />
-          </NavLink>
-        </div>
+      <aside className="app-sidebar" aria-label="Workspace sidebar">
+        <NavLink to="/" end className="brand">
+          <span className="brand-mark">
+            <Hexagon size={21} strokeWidth={2.5} aria-hidden="true" />
+          </span>
+          <span>HiveCLI</span>
+        </NavLink>
+
+        <WorkspaceDirectoryControl
+          workspaceName={workspaceDetail?.workspace.name}
+          rootStatus={workspaceRootStatus}
+          onUpdateRoot={updateWorkspaceRoot}
+          disabled={!workspaceDetail || runningTask}
+        />
+
+        <nav className="app-nav" aria-label="Workspace">
+          {navigation.map(({ to, label, icon: Icon }) => (
+            <NavLink key={to} to={to} end className="nav-item">
+              <Icon size={17} strokeWidth={1.8} aria-hidden="true" />
+              {label}
+            </NavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="app-main">
+        <header className="app-topbar">
+          <div className="app-crumb">
+            <span>{workspaceDetail?.workspace.name ?? "Workspace"}</span>
+            <ChevronRight size={14} aria-hidden="true" />
+            <strong>{page}</strong>
+          </div>
+          <span className="connection-state" data-state={connectionState} role="status">
+            <span aria-hidden="true" />
+            {connectionLabel}
+          </span>
+        </header>
+        {bootError ? (
+          <main className="page-frame">
+            <h1 className="page-title">Workspace unavailable</h1>
+            <p className="page-description" role="alert">{bootError}</p>
+            <button type="button" className="control-button mt-5" onClick={() => void boot()}>
+              Retry connection
+            </button>
+          </main>
+        ) : (
+          <main className="page-frame" id="main-content">
+            <Outlet />
+          </main>
+        )}
       </div>
-      <WorkspaceDirectoryControl
-        workspaceName={workspaceDetail?.workspace.name}
-        rootStatus={workspaceRootStatus}
-        taskPaths={currentTaskPaths}
-        onUpdateRoot={updateWorkspaceRoot}
-      />
-      <Outlet />
     </div>
   );
 }

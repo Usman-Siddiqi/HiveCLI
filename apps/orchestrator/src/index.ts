@@ -8,13 +8,21 @@ import { createDatabase } from "./db/client";
 import { Repository } from "./db/repository";
 import { createApiRouter } from "./routes/api";
 import { TaskService } from "./sessions/task-service";
+import { isTrustedLocalRequest } from "./utils/local-request";
 import { EventHub } from "./ws/hub";
 
 export function createApp() {
   const app = express();
-  app.use(express.json({ limit: "2mb" }));
+  app.use((request, response, next) => {
+    if (!isTrustedLocalRequest(request)) {
+      response.status(403).send("This origin or host is not allowed to access HiveCLI.");
+      return;
+    }
+    next();
+  });
 
-  app.use(cors());
+  app.use(cors({ origin: true }));
+  app.use(express.json({ limit: "2mb" }));
 
   const database = createDatabase();
   bootstrapDatabase(database.sqlite);

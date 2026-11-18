@@ -25,3 +25,16 @@ export function truncateMiddle(value: string, start = 14, end = 12): string {
 
   return `${value.slice(0, start)}...${value.slice(-end)}`;
 }
+
+export function workspaceRelativePath(value: string, root?: string | null) {
+  if (!root) return value;
+
+  const prefix = root.replaceAll("\\", "/").replace(/\/+$/, "") + "/";
+  const normalized = value.replaceAll("\\", "/");
+  const windows = /^[A-Za-z]:\//.test(prefix) || prefix.startsWith("//");
+  const insideRoot = windows
+    ? normalized.toLowerCase().startsWith(prefix.toLowerCase())
+    : normalized.startsWith(prefix);
+
+  return insideRoot ? normalized.slice(prefix.length) : value;
+}

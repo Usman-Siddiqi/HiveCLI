@@ -52,5 +52,5 @@ export async function requireWorkspaceRoot(rootPath: string) {
     throw new Error(status.error ?? "Project directory is invalid.");
   }
 
-  return status;
+  return { ...status, resolvedPath: await fs.realpath(status.resolvedPath) };
 }

@@ -20,12 +20,16 @@ describe("run-workspace", () => {
     await fs.writeFile(path.join(projectRoot, "app.ts"), "console.log('ok');\n");
     await fs.writeFile(path.join(projectRoot, ".git", "HEAD"), "ref: main\n");
     await fs.writeFile(path.join(projectRoot, ".hivecli", "state.txt"), "ignored\n");
+    await fs.writeFile(path.join(projectRoot, ".env.local"), "REDACTED=fixture\n");
+    await fs.writeFile(path.join(projectRoot, ".env.example"), "REDACTED=\n");
 
     const prepared = await prepareRunWorkspace(projectRoot, "task-1");
 
     await expect(fs.stat(path.join(prepared.paths.sourceDir, "app.ts"))).resolves.toBeTruthy();
     await expect(fs.stat(path.join(prepared.paths.sourceDir, ".git"))).rejects.toBeTruthy();
     await expect(fs.stat(path.join(prepared.paths.sourceDir, ".hivecli"))).rejects.toBeTruthy();
+    await expect(fs.stat(path.join(prepared.paths.sourceDir, ".env.local"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(fs.stat(path.join(prepared.paths.sourceDir, ".env.example"))).resolves.toBeTruthy();
     await expect(fs.stat(path.join(prepared.paths.workerDirs[0], "app.ts"))).resolves.toBeTruthy();
   });
 
@@ -46,9 +50,10 @@ describe("run-workspace", () => {
     expect(artifacts.diffSummary).toContain("worker-b/new-file.ts");
   });
 
-  it("parses implementer decisions and defaults to merge", () => {
+  it("reads an explicit implementer decision and rejects missing decisions", () => {
     expect(parseImplementerDecision("DECISION: COPY_WORKER_B\nRATIONALE: Better tests.")).toBe("COPY_WORKER_B");
-    expect(parseImplementerDecision("No structured block here.")).toBe("MERGE");
+    expect(parseImplementerDecision("DECISION: MERGE\nAgent output follows:\nDECISION: copy_worker_a")).toBe("COPY_WORKER_A");
+    expect(parseImplementerDecision("No structured block here.")).toBeUndefined();
   });
 
   it("validates workspace root paths", async () => {

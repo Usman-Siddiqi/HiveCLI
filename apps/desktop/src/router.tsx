@@ -1,7 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 
 import { AppLayout } from "@/components/app-layout";
-import { SettingsPage } from "@/pages/settings-page";
 import { SwarmPage } from "@/pages/swarm-page";
 
 export const router = createBrowserRouter([
@@ -10,7 +9,14 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <SwarmPage /> },
-      { path: "settings", element: <SettingsPage /> },
+      {
+        path: "history",
+        lazy: async () => ({ Component: (await import("@/pages/history-page")).HistoryPage }),
+      },
+      {
+        path: "settings",
+        lazy: async () => ({ Component: (await import("@/pages/settings-page")).SettingsPage }),
+      },
     ],
   },
 ]);

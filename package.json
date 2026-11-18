@@ -3,14 +3,14 @@
   "private": true,
   "packageManager": "pnpm@10.28.1",
   "engines": {
-    "node": ">=22 <26"
+    "node": ">=22.13"
   },
   "scripts": {
     "start": "node ./scripts/start-hivecli.mjs",
     "start:tauri": "node ./scripts/start-hivecli.mjs --tauri",
-    "dev": "pnpm -r --parallel --if-present dev",
+    "dev": "node ./scripts/start-hivecli.mjs",
     "build": "pnpm -r --if-present build",
-    "check": "pnpm -r --if-present check",
+    "check": "pnpm build && pnpm test",
     "lint": "pnpm -r --if-present lint",
     "test:ui": "node ./scripts/playwright-smoke.mjs",
     "test": "pnpm -r --if-present test",
@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.6.0",
-    "playwright": "^1.58.2",
+    "playwright": "^1.65.1",
     "typescript": "^5.9.3"
   }
 }

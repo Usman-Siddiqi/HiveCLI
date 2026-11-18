@@ -9,11 +9,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "border-[var(--accent)] bg-[var(--accent)] text-[#17120b] hover:bg-[#d59843]",
+          "border-[var(--accent)] bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-hover)]",
         secondary:
-          "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[rgba(255,255,255,0.04)]",
+          "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-strong)]",
         ghost:
-          "border-transparent bg-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text)]",
+          "border-transparent bg-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--surface-strong)] hover:text-[var(--text)]",
         danger:
           "border-[var(--danger)] bg-[var(--danger)] text-[#180d0a] hover:bg-[#cd7664]",
       },

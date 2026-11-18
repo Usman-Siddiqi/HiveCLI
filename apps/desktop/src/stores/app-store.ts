@@ -2,12 +2,14 @@ import {
   BUILTIN_AGENT_TEMPLATES,
   CODEX_CLI_ARGS,
   shouldMigrateCodexCliArgs,
-  type AgentEvent,
-  type AgentRun,
-  type SessionReplay,
-  type SessionSnapshot,
-  type Workspace,
-  type WorkspaceDetail,
+} from "@hive/shared/constants";
+import type {
+  AgentEvent,
+  AgentRun,
+  SessionReplay,
+  SessionSnapshot,
+  Workspace,
+  WorkspaceDetail,
 } from "@hive/shared";
 import { create } from "zustand";
 
@@ -63,26 +65,36 @@ function pickInitialWorkspace(workspaces: Workspace[]) {
 }
 
 function assignRoles(agents: WorkspaceDetail["agents"]): HiveAgentRoles {
-  const find = (hints: string[]) =>
-    agents.find((agent) => hints.some((hint) => agent.name.toLowerCase().includes(hint)))?.id;
+  const selected = new Set<string>();
+  const enabled = agents.filter((agent) => agent.enabled);
+  const take = (matches: (agent: typeof enabled[number]) => boolean) => {
+    const agent = enabled.find((candidate) => !selected.has(candidate.id) && matches(candidate));
+    if (agent) selected.add(agent.id);
+    return agent?.id;
+  };
 
-  const workerA = find(["worker a", "worker-a", "worker_a"]) ?? agents[0]?.id;
-  const workerB = find(["worker b", "worker-b", "worker_b"]) ?? agents[1]?.id;
-  const judge = find(["judge"]) ?? agents.find((agent) => agent.canJudge)?.id ?? agents[2]?.id;
-  const implementer = find(["implementer", "implement"]) ?? agents[3]?.id;
+  const judge = take((agent) => agent.canJudge && /judge/i.test(agent.name))
+    ?? take((agent) => agent.canJudge);
+  const implementer = take((agent) => /implementer/i.test(agent.name));
+  const namedWorkerA = take((agent) => /worker[ _-]a\b/i.test(agent.name));
+  const namedWorkerB = take((agent) => /worker[ _-]b\b/i.test(agent.name));
 
-  return { workerA, workerB, judge, implementer };
+  return {
+    workerA: namedWorkerA ?? take(() => true),
+    workerB: namedWorkerB ?? take(() => true),
+    judge,
+    implementer,
+  };
 }
 
-function optimisticRootStatus(rootPath: string): WorkspaceRootStatus {
-  const hasPath = rootPath.trim().length > 0;
+function unverifiedRootStatus(rootPath: string): WorkspaceRootStatus {
   return {
     rootPath,
-    resolvedPath: hasPath ? rootPath : null,
-    exists: hasPath,
-    isDirectory: hasPath,
-    valid: hasPath,
-    error: null,
+    resolvedPath: null,
+    exists: false,
+    isDirectory: false,
+    valid: false,
+    error: "Unable to verify the project directory.",
   };
 }
 
@@ -151,6 +163,9 @@ function deriveCurrentTaskPaths(
 
 interface AppState {
   runtimeReady: boolean;
+  bootError?: string;
+  runningTask: boolean;
+  streamingTaskId?: string;
   workspaces: Workspace[];
   workspaceDetail?: WorkspaceDetail;
   workspaceRootStatus?: WorkspaceRootStatus;
@@ -165,7 +180,7 @@ interface AppState {
 
   boot: () => Promise<void>;
   loadWorkspace: (workspaceId: string) => Promise<void>;
-  loadSession: (sessionId: string) => Promise<void>;
+  loadSession: (sessionId: string, taskId?: string) => Promise<void>;
   refreshSessions: (workspaceId: string) => Promise<void>;
   refreshWorkspaceRootStatus: (workspaceId?: string) => Promise<void>;
   updateWorkspaceRoot: (rootPath: string) => Promise<void>;
@@ -176,31 +191,57 @@ interface AppState {
 }
 
 let socket: WebSocket | null = null;
+let pendingConnection = false;
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+let retryDelay = 1_000;
+let pendingBoot: Promise<void> | undefined;
 
 function connectWebsocket(
   pushEvent: (event: AgentEvent) => void,
   setConnection: (state: AppState["connectionState"]) => void,
 ) {
-  if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
-    return;
-  }
+  if (pendingConnection || socket) return;
 
+  clearTimeout(retryTimer);
+  pendingConnection = true;
   setConnection("connecting");
+  const retry = () => {
+    socket = null;
+    setConnection("closed");
+    retryTimer = setTimeout(() => connectWebsocket(pushEvent, setConnection), retryDelay);
+    retryDelay = Math.min(retryDelay * 2, 10_000);
+  };
+
   void getRuntimeConfig().then((runtime) => {
-    socket = new WebSocket(runtime.websocketUrl);
-    socket.addEventListener("open", () => setConnection("open"));
-    socket.addEventListener("close", () => setConnection("closed"));
-    socket.addEventListener("message", (message) => {
-      const payload = JSON.parse(message.data) as { kind: string; data: AgentEvent };
-      if (payload.kind === "agent-event") {
-        pushEvent(payload.data);
+    const nextSocket = new WebSocket(runtime.websocketUrl);
+    socket = nextSocket;
+    nextSocket.addEventListener("open", () => {
+      retryDelay = 1_000;
+      setConnection("open");
+    });
+    nextSocket.addEventListener("close", retry, { once: true });
+    nextSocket.addEventListener("message", (message) => {
+      try {
+        const payload = JSON.parse(message.data) as { kind: string; data: AgentEvent };
+        if (payload.kind === "agent-event") pushEvent(payload.data);
+      } catch {
+        // Ignore malformed messages and continue receiving the live stream.
       }
     });
+  }).catch(retry).finally(() => {
+    pendingConnection = false;
   });
+}
+
+const TRANSCRIPT_LIMIT = 160_000;
+
+function appendOutput(output: string, chunk: string) {
+  return (output + chunk).slice(-TRANSCRIPT_LIMIT);
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   runtimeReady: false,
+  runningTask: false,
   workspaces: [],
   sessions: [],
   runOutputs: {},
@@ -208,22 +249,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   roles: {},
   connectionState: "idle",
 
-  boot: async () => {
-    const workspaces = await api.listWorkspaces();
-    set({ workspaces, runtimeReady: true });
+  boot: () => {
+    if (pendingBoot) return pendingBoot;
 
-    connectWebsocket(
-      (event) => get().pushEvent(event),
-      (connectionState) => set({ connectionState }),
-    );
+    set({ bootError: undefined });
+    pendingBoot = (async () => {
+      const workspaces = await api.listWorkspaces();
+      set({ workspaces });
 
-    const initialWorkspace = pickInitialWorkspace(workspaces);
+      const initialWorkspace = pickInitialWorkspace(workspaces);
+      if (initialWorkspace) {
+        await get().loadWorkspace(initialWorkspace.id);
+      } else {
+        await get().ensureCodexWorkspace();
+      }
 
-    if (initialWorkspace) {
-      await get().loadWorkspace(initialWorkspace.id);
-    } else {
-      await get().ensureCodexWorkspace();
-    }
+      connectWebsocket(
+        (event) => get().pushEvent(event),
+        (connectionState) => set({ connectionState }),
+      );
+      set({ runtimeReady: true });
+    })().catch((error: unknown) => {
+      const detail = error instanceof Error ? error.message : "Unknown error.";
+      set({ bootError: `Start the local orchestrator with pnpm start and try again. ${detail}` });
+    }).finally(() => {
+      pendingBoot = undefined;
+    });
+
+    return pendingBoot;
   },
 
   ensureCodexWorkspace: async () => {
@@ -275,11 +328,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const roles = assignRoles(workspaceDetail.agents);
 
-    let workspaceRootStatus = optimisticRootStatus(workspaceDetail.workspace.rootPath);
+    let workspaceRootStatus = unverifiedRootStatus(workspaceDetail.workspace.rootPath);
     try {
       workspaceRootStatus = await api.getWorkspaceRootStatus(workspaceId);
     } catch {
-      workspaceRootStatus = optimisticRootStatus(workspaceDetail.workspace.rootPath);
+      workspaceRootStatus = unverifiedRootStatus(workspaceDetail.workspace.rootPath);
     }
 
     const nextTaskPaths = deriveCurrentTaskPaths(
@@ -296,9 +349,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaceRootStatus,
       currentTaskPaths: nextTaskPaths,
       workspaceError: undefined,
-      workspaces: get().workspaces.map((workspace) =>
-        workspace.id === workspaceDetail.workspace.id ? workspaceDetail.workspace : workspace,
-      ),
+      workspaces: [
+        ...get().workspaces.filter((workspace) => workspace.id !== workspaceId),
+        workspaceDetail.workspace,
+      ],
     });
   },
 
@@ -317,7 +371,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ workspaceRootStatus });
     } catch {
       const rootPath = get().workspaceDetail?.workspace.rootPath ?? "";
-      set({ workspaceRootStatus: optimisticRootStatus(rootPath) });
+      set({ workspaceRootStatus: unverifiedRootStatus(rootPath) });
     }
   },
 
@@ -361,79 +415,82 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ workspaceError: undefined });
   },
 
-  loadSession: async (sessionId) => {
+  loadSession: async (sessionId, taskId) => {
     const activeSession = await api.getSession(sessionId);
+    const task = taskId
+      ? activeSession.tasks.find(({ task }) => task.id === taskId)
+      : activeSession.tasks.at(-1);
+    const transcriptByRun = new Map<string, string>();
+    for (const event of activeSession.events) {
+      if (event.taskId === task?.task.id && ["stdout", "stderr", "message"].includes(event.type)) {
+        transcriptByRun.set(event.agentRunId, appendOutput(transcriptByRun.get(event.agentRunId) ?? "", event.payload));
+      }
+    }
     const runOutputs = Object.fromEntries(
-      activeSession.tasks.flatMap((taskRun) =>
-        taskRun.runs.map((run) => [run.id, { run, output: run.finalText ?? "" }]),
-      ),
+      (task?.runs ?? []).map((run) => [run.id, { run, output: transcriptByRun.get(run.id) || run.finalText || "" }]),
     );
 
     set({
       activeSession,
       runOutputs,
-      events: activeSession.events,
-      currentTaskPaths: deriveCurrentTaskPaths(
-        get().workspaceDetail,
-        activeSession,
-        runOutputs,
-        get().roles,
-      ),
+      events: activeSession.events.slice(-400).reverse(),
+      currentTaskPaths: deriveCurrentTaskPaths(get().workspaceDetail, activeSession, runOutputs, get().roles),
     });
   },
 
   runHiveTask: async (prompt) => {
-    const {
-      workspaceDetail,
-      activeSession,
-      roles,
-      refreshSessions,
-      loadSession,
-      workspaceRootStatus,
-    } = get();
+    const { workspaceDetail, roles, workspaceRootStatus, runningTask, connectionState } = get();
+    if (runningTask || !workspaceDetail || !prompt.trim()) return;
 
-    if (!workspaceDetail) {
-      return;
+    if (!workspaceRootStatus?.valid || connectionState !== "open") {
+      throw new Error("Connect the orchestrator and choose a valid project directory before running a task.");
     }
 
-    if (!workspaceRootStatus?.valid) {
-      set({ workspaceError: "Select a valid project directory before running a task." });
-      return;
+    const { workerA, workerB, judge, implementer } = roles;
+    if (!workerA || !workerB || !judge || !implementer) {
+      throw new Error("Configure agents for all four council roles before starting a run.");
     }
-
-    const allAgentIds = [roles.workerA, roles.workerB, roles.judge, roles.implementer].filter(Boolean) as string[];
 
     set({
+      runningTask: true,
+      streamingTaskId: undefined,
+      activeSession: undefined,
       runOutputs: {},
       events: [],
       workspaceError: undefined,
-      currentTaskPaths: {
-        rootPath: workspaceDetail.workspace.rootPath,
-      },
+      currentTaskPaths: { rootPath: workspaceDetail.workspace.rootPath },
     });
 
+    let submitted = false;
     try {
       const response = await api.runTask({
         workspaceId: workspaceDetail.workspace.id,
-        sessionId: activeSession?.session.id,
-        prompt,
+        prompt: prompt.trim(),
         mode: "council",
-        agentIds: allAgentIds,
-        judgeAgentId: roles.judge ?? null,
+        agentIds: [workerA, workerB, judge, implementer],
+        judgeAgentId: judge,
       });
 
-      await refreshSessions(workspaceDetail.workspace.id);
-      await loadSession(response.sessionId);
+      submitted = true;
+      await Promise.all([get().refreshSessions(workspaceDetail.workspace.id), get().loadSession(response.sessionId, response.taskId)]);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error.";
       set({
-        workspaceError:
-          error instanceof Error ? error.message : "Task run failed before the agents could start.",
+        workspaceError: submitted
+          ? `The run ended, but its saved results could not be refreshed. ${message}`
+          : message,
       });
-      throw error;
+      if (!submitted) throw error;
+    } finally {
+      set({ runningTask: false, streamingTaskId: undefined });
     }
   },
 
   pushEvent: (event) => {
+    const { runningTask, streamingTaskId, roles } = get();
+    if (!runningTask || !Object.values(roles).includes(event.agentId)) return;
+    if (streamingTaskId && streamingTaskId !== event.taskId) return;
+
     const current = get().runOutputs[event.agentRunId] ?? {
       run: {
         id: event.agentRunId,
@@ -452,19 +509,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       nextRun.status = event.payload as AgentRun["status"];
     }
     if (event.type === "stdout" || event.type === "stderr" || event.type === "message") {
-      nextOutput += event.payload;
+      nextOutput = appendOutput(nextOutput, event.payload);
     }
     if (event.type === "final") {
       nextRun.finalText = event.payload;
-      nextRun.status = "completed";
-      nextOutput = event.payload;
     }
     if (event.type === "error") {
       nextRun.errorText = event.payload;
-      nextRun.status = "failed";
     }
     if (event.type === "exit") {
-      const exitCode = Number(event.payload);
+      const exitCode = event.payload.length ? Number(event.payload) : Number.NaN;
       nextRun.exitCode = Number.isFinite(exitCode) ? exitCode : null;
       nextRun.finishedAt = new Date().toISOString();
     }
@@ -479,6 +533,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
 
       return {
+        streamingTaskId: event.taskId,
         events: [event, ...state.events].slice(0, 400),
         runOutputs: nextRunOutputs,
         currentTaskPaths: deriveCurrentTaskPaths(

@@ -1,64 +1,58 @@
 import { useState } from "react";
-import { Send } from "lucide-react";
+import { ArrowUpRight, LoaderCircle } from "lucide-react";
 
 interface PromptBarProps {
-    onSubmit: (prompt: string) => Promise<void>;
-    disabled?: boolean;
-    reason?: string;
+  onSubmit: (prompt: string) => Promise<void>;
+  disabled?: boolean;
+  reason?: string;
+  error?: string;
+  running: boolean;
 }
 
-export function PromptBar({ onSubmit, disabled, reason }: PromptBarProps) {
-    const [prompt, setPrompt] = useState("");
-    const [submitting, setSubmitting] = useState(false);
+export function PromptBar({ onSubmit, disabled, reason, error, running }: PromptBarProps) {
+  const [prompt, setPrompt] = useState("");
+  const canSubmit = !disabled && !running && !!prompt.trim();
 
-    async function handleSubmit() {
-        const text = prompt.trim();
-        if (!text) return;
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!canSubmit) return;
 
-        setSubmitting(true);
-        try {
-            await onSubmit(text);
-            setPrompt("");
-        } finally {
-            setSubmitting(false);
-        }
+    try {
+      await onSubmit(prompt.trim());
+      setPrompt("");
+    } catch {
+      // The store exposes the error to the composer. Keep the draft for retry.
     }
+  }
 
-    function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
-        if (event.key === "Enter" && !event.shiftKey) {
+  return (
+    <form className="prompt-composer" onSubmit={handleSubmit}>
+      <label className="prompt-label" htmlFor="council-prompt">Task brief</label>
+      <textarea
+        id="council-prompt"
+        data-testid="prompt-input"
+        value={prompt}
+        onChange={(event) => setPrompt(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
             event.preventDefault();
-            void handleSubmit();
-        }
-    }
-
-    const isDisabled = disabled || submitting || !prompt.trim();
-
-    return (
-        <div className="hive-bar-shell">
-            <div className="hive-bar">
-                <textarea
-                    data-testid="prompt-input"
-                    value={prompt}
-                    onChange={(event) => setPrompt(event.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Describe your task — HiveCLI will seed worker folders, compare outputs, and publish the final result…"
-                    rows={1}
-                    className="hive-bar-input"
-                    disabled={submitting}
-                />
-                <button
-                    data-testid="prompt-send"
-                    onClick={() => void handleSubmit()}
-                    disabled={isDisabled}
-                    className="hive-bar-send"
-                >
-                    <Send className="h-4 w-4" />
-                    {submitting ? "Running…" : "Send"}
-                </button>
-            </div>
-            <div className="hive-bar-note" data-testid="prompt-note">
-                {reason ?? "Workers get isolated folders; the original project directory stays read-only for this run."}
-            </div>
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        placeholder="Describe the change you want and how to verify it."
+        rows={3}
+        readOnly={running}
+        aria-describedby="prompt-note"
+      />
+      <div className="composer-footer">
+        <div id="prompt-note" className="composer-note" data-testid="prompt-note" role={error ? "alert" : undefined}>
+          {error ? <span className="form-error">{error}</span> : reason ?? <>Run with <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Enter</kbd></>}
         </div>
-    );
+        <button data-testid="prompt-send" type="submit" className="control-button" disabled={!canSubmit}>
+          {running ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <ArrowUpRight size={17} aria-hidden="true" />}
+          {running ? "Running…" : "Run council"}
+        </button>
+      </div>
+    </form>
+  );
 }

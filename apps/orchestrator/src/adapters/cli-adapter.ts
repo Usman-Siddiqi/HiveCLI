@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process";
-import { unlinkSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -10,70 +10,148 @@ import type { AgentDefinition, AgentRunRequest } from "@hive/shared";
 import { sanitizeFinalText } from "../utils/ansi";
 import type { AdapterEventHandlers, AgentAdapter, RunningAdapter } from "./base";
 
-function interpolateValue(value: string, request: AgentRunRequest) {
-  return value
-    .replaceAll("{{prompt}}", request.prompt)
-    .replaceAll("{{sessionId}}", request.sessionId)
-    .replaceAll("{{taskId}}", request.taskId)
-    .replaceAll("{{workspaceRoot}}", request.workspaceRoot)
-    .replaceAll("{{sourceDir}}", request.sourceDir ?? "")
-    .replaceAll("{{workingDir}}", request.workingDir ?? "")
-    .replaceAll("{{runRootDir}}", request.runRootDir ?? "")
-    .replaceAll("{{publishDir}}", request.publishDir ?? "");
-}
+const MAX_FINAL_CHARS = 256 * 1024;
 
-function interpolateArgs(args: string[] | undefined, request: AgentRunRequest) {
-  return (args ?? []).map((arg) => interpolateValue(arg, request));
+function interpolateValue(value: string, request: AgentRunRequest) {
+  const values: Record<string, string> = {
+    prompt: request.prompt,
+    sessionId: request.sessionId,
+    taskId: request.taskId,
+    workspaceRoot: request.workspaceRoot,
+    sourceDir: request.sourceDir ?? "",
+    workingDir: request.workingDir ?? "",
+    runRootDir: request.runRootDir ?? "",
+    publishDir: request.publishDir ?? "",
+  };
+  return value.replace(/\{\{(\w+)\}\}/g, (placeholder, key: string) =>
+    Object.hasOwn(values, key) ? values[key] : placeholder,
+  );
 }
 
 function quoteForCmd(value: string) {
-  const needsQuotes = /[\s"&()<>^|]/.test(value) || value.includes("\n") || value.includes("\r");
-  if (!needsQuotes) {
-    return value;
-  }
-
+  if (value && !/[\s"&()<>^|]/.test(value)) return value;
   return `"${value.replace(/"/g, '""')}"`;
 }
 
-function resolveWindowsCommand(command: string, cwd: string, env: NodeJS.ProcessEnv) {
-  const extension = path.extname(command).toLowerCase();
-  if (command.includes("\\") || command.includes("/") || extension) {
-    return command;
-  }
+function resolveWindowsCommand(command: string, env: NodeJS.ProcessEnv) {
+  if (command.includes("\\") || command.includes("/")) return command;
 
-  const result = spawnSync("where.exe", [command], {
-    cwd,
+  const systemDir = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32");
+  const result = spawnSync(path.join(systemDir, "where.exe"), [command], {
+    cwd: systemDir,
     env,
     encoding: "utf8",
     windowsHide: true,
   });
 
-  if (result.status !== 0) {
-    return command;
+  if (result.status !== 0) return command;
+  const matches = result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const installed = matches.filter((value) => !value.toLowerCase().includes("\\windowsapps\\"));
+  const executable = installed.find((value) => /\.(exe|com)$/i.test(value));
+  const shim = installed.find((value) => /\.(cmd|bat)$/i.test(value));
+  return executable ?? shim ?? matches[0] ?? command;
+}
+
+function getSpawnCommand(command: string, args: string[], env: NodeJS.ProcessEnv, usesRequestArguments: boolean) {
+  if (process.platform !== "win32") return { command, args, verbatim: false };
+
+  const resolved = resolveWindowsCommand(command, env);
+  if (!/\.(cmd|bat)$/i.test(resolved)) return { command: resolved, args, verbatim: false };
+
+  if (usesRequestArguments) {
+    throw new Error("Windows batch agents cannot substitute request data into command arguments. Use a native executable or pass the prompt through standard input.");
   }
 
-  const matches = result.stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const script = [resolved, ...args].map(quoteForCmd).join(" ");
+  return {
+    command: process.env.ComSpec ?? "cmd.exe",
+    args: ["/d", "/s", "/c", `"${script}"`],
+    verbatim: true,
+  };
+}
 
-  if (matches.length === 0) {
-    return command;
+function recentText(previous: string, chunk: string) {
+  return (previous + chunk).slice(-MAX_FINAL_CHARS);
+}
+
+function readFinalMessage(file: string | undefined, fallback: string) {
+  try {
+    if (file && statSync(file).size <= MAX_FINAL_CHARS) {
+      const text = readFileSync(file, "utf8").trim();
+      if (text) return text;
+    }
+  } catch {
+    // A failed CLI may exit before writing the final message.
   }
+  return sanitizeFinalText(fallback, "codex");
+}
 
-  const rank = (match: string) => {
-    const extension = path.extname(match).toLowerCase();
-    const isWindowsApps = match.toLowerCase().includes("\\windowsapps\\");
-
-    if (!isWindowsApps && [".exe", ".com"].includes(extension)) return 0;
-    if (!isWindowsApps && [".cmd", ".bat"].includes(extension)) return 1;
-    if (!isWindowsApps) return 2;
-    if ([".exe", ".com"].includes(extension)) return 3;
-    if ([".cmd", ".bat"].includes(extension)) return 4;
-    return 5;
+function runCodex(
+  commandTemplate: string,
+  configuration: string[],
+  request: AgentRunRequest,
+  options: { cwd: string; env: NodeJS.ProcessEnv },
+  handlers: AdapterEventHandlers,
+) {
+  const writesOwnMessage = configuration.some((arg) =>
+    arg === "-o" || arg.startsWith("-o=") || arg === "--output-last-message" || arg.startsWith("--output-last-message="),
+  );
+  const tempDir = writesOwnMessage ? undefined : mkdtempSync(path.join(os.tmpdir(), "hivecli-message-"));
+  const messageFile = tempDir ? path.join(tempDir, "final.txt") : undefined;
+  const cleanup = () => {
+    if (!tempDir) return;
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // Temporary output cleanup does not affect the completed run.
+    }
   };
 
-  return [...matches].sort((left, right) => rank(left) - rank(right))[0];
+  const args = configuration.map((arg) => arg === "{{prompt}}" ? "-" : interpolateValue(arg, request));
+  if (messageFile) args.splice(1, 0, "--output-last-message", messageFile);
+
+  let child;
+  try {
+    const usesRequestArguments = /\{\{\w+\}\}/.test(commandTemplate) || configuration.some(
+      (arg) => arg !== "{{prompt}}" && /\{\{\w+\}\}/.test(arg),
+    );
+    const command = interpolateValue(commandTemplate, request);
+    const spec = getSpawnCommand(command, args, options.env, usesRequestArguments);
+    child = spawn(spec.command, spec.args, {
+      ...options,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+      windowsVerbatimArguments: spec.verbatim,
+    });
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
+
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+    stdout = recentText(stdout, chunk);
+    handlers.onStdout(chunk);
+  });
+  child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+    stderr = recentText(stderr, chunk);
+    handlers.onStderr(chunk);
+  });
+  child.on("error", handlers.onError);
+  child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code !== "EPIPE") handlers.onError(error);
+  });
+  const done = new Promise<void>((resolve) => {
+    child.once("close", (exitCode) => {
+      handlers.onExit(exitCode);
+      handlers.onFinal(readFinalMessage(messageFile, stdout || stderr));
+      cleanup();
+      resolve();
+    });
+  });
+  child.stdin.end(request.prompt);
+  return { done, stop: async () => { child.kill(); } };
 }
 
 export class CliAgentAdapter implements AgentAdapter {
@@ -99,109 +177,56 @@ export class CliAgentAdapter implements AgentAdapter {
   ): RunningAdapter {
     this.validateConfig(agent);
 
-    const command = interpolateValue(agent.command!, request);
-    const isWindows = process.platform === "win32";
-    const shouldUseCodexPromptFile = isWindows && agent.provider === "codex" && (agent.args ?? []).some((arg) => arg.includes("{{prompt}}"));
-    const tempPromptFile = shouldUseCodexPromptFile
-      ? path.join(os.tmpdir(), `hivecli-prompt-${request.taskId}-${request.agentId}.txt`)
-      : null;
-
-    if (tempPromptFile) {
-      writeFileSync(tempPromptFile, request.prompt, "utf8");
-    }
-
-    const args = shouldUseCodexPromptFile
-      ? (agent.args ?? []).map((arg) => (arg.includes("{{prompt}}") ? "-" : interpolateValue(arg, request)))
-      : interpolateArgs(agent.args, request);
-    const hasPromptPlaceholder = [command, ...args].some((part) => part.includes(request.prompt));
-
-    handlers.onStatus("running");
-
-    const effectiveCwd = request.workingDir || agent.cwd || request.workspaceRoot;
-
-    // On Windows, node-pty cannot resolve PATH on its own, so we spawn
-    // through a resolved executable path when possible. Codex uses a
-    // temp prompt file + stdin redirection to preserve multiline prompts.
-    const runtimeEnv = {
-      ...process.env,
-      ...(agent.env ?? {}),
+    const configuredArgs = agent.args ?? [];
+    const options = {
+      cwd: request.workingDir || agent.cwd || request.workspaceRoot,
+      env: { ...process.env, ...agent.env },
     };
 
-    let spawnCommand = command;
-    let spawnArgs = args;
-
-    if (isWindows) {
-      const resolvedCommand = resolveWindowsCommand(command, effectiveCwd, runtimeEnv);
-      const resolvedExtension = path.extname(resolvedCommand).toLowerCase();
-      const shouldSpawnDirectly =
-        [".exe", ".com"].includes(resolvedExtension) ||
-        command.includes("\\") ||
-        command.includes("/") ||
-        Boolean(path.extname(command));
-      const isWindowsAppsBinary = resolvedCommand.toLowerCase().includes("\\windowsapps\\");
-
-      if (shouldSpawnDirectly && !isWindowsAppsBinary) {
-        spawnCommand = resolvedCommand;
-      } else {
-        spawnCommand = "cmd.exe";
-        const redirect = tempPromptFile ? ` < ${quoteForCmd(tempPromptFile)}` : "";
-        spawnArgs = ["/d", "/c", `call ${quoteForCmd(resolvedCommand)} ${args.map(quoteForCmd).join(" ")}${redirect}`];
-      }
+    handlers.onStatus("running");
+    if (agent.provider === "codex" && configuredArgs[0] === "exec" && configuredArgs.includes("{{prompt}}")) {
+      return runCodex(agent.command!, configuredArgs, request, options, handlers);
     }
 
-    const ptyProcess = pty.spawn(spawnCommand, spawnArgs, {
+    const command = interpolateValue(agent.command!, request);
+    const args = configuredArgs.map((arg) => interpolateValue(arg, request));
+    const usesRequestArguments = [agent.command!, ...configuredArgs].some((arg) => /\{\{\w+\}\}/.test(arg));
+    const spec = getSpawnCommand(command, args, options.env, usesRequestArguments);
+    const ptyProcess = pty.spawn(spec.command, spec.verbatim ? spec.args.join(" ") : spec.args, {
+      ...options,
       name: "xterm-color",
       cols: 120,
       rows: 40,
-      cwd: effectiveCwd,
-      env: runtimeEnv,
     });
 
-    let stdoutBuffer = "";
-    let exitHandled = false;
-
+    let stdout = "";
+    let exited = false;
     const done = new Promise<void>((resolve) => {
       ptyProcess.onData((data) => {
-        stdoutBuffer += data;
+        stdout = recentText(stdout, data);
         handlers.onStdout(data);
       });
-
-      ptyProcess.onExit(({ exitCode }) => {
-        exitHandled = true;
-        handlers.onExit(exitCode);
-        handlers.onFinal(sanitizeFinalText(stdoutBuffer, agent.provider));
-        if (tempPromptFile) {
-          try {
-            unlinkSync(tempPromptFile);
-          } catch {
-            // Ignore prompt file cleanup failures.
-          }
-        }
+      ptyProcess.onExit(({ exitCode, signal }) => {
+        exited = true;
+        if (signal) handlers.onError(new Error(`Agent was interrupted by signal ${signal}.`));
+        handlers.onExit(signal ? null : exitCode);
+        handlers.onFinal(sanitizeFinalText(stdout, agent.provider));
         resolve();
       });
     });
 
-    try {
-      if (!hasPromptPlaceholder) {
+    if (![agent.command!, ...configuredArgs].some((part) => part.includes("{{prompt}}"))) {
+      try {
         ptyProcess.write(`${request.prompt}\r`);
+      } catch (error) {
+        handlers.onError(error as Error);
       }
-    } catch (error) {
-      handlers.onError(error as Error);
     }
 
     return {
       done,
       stop: async () => {
-        if (!exitHandled) {
-          ptyProcess.kill();
-        }
-        if (tempPromptFile) {
-          try {
-            unlinkSync(tempPromptFile);
-          } catch {
-            // Ignore prompt file cleanup failures.
-          }
-        }
+        if (!exited) ptyProcess.kill();
       },
     };
   }

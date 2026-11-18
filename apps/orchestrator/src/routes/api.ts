@@ -7,7 +7,7 @@ import {
 } from "@hive/shared";
 
 import { Repository } from "../db/repository";
-import { TaskService } from "../sessions/task-service";
+import { TaskInputError, TaskService } from "../sessions/task-service";
 import { getWorkspaceRootStatus } from "../utils/workspace-root";
 
 export function createApiRouter(repository: Repository, taskService: TaskService) {
@@ -87,11 +87,18 @@ export function createApiRouter(repository: Repository, taskService: TaskService
   });
 
   router.post("/api/tasks/run", async (request, response, next) => {
+    const input = runTaskInputSchema.safeParse(request.body);
+    if (!input.success) {
+      response.status(400).send(input.error.issues.map(({ message }) => message).join("\n"));
+      return;
+    }
     try {
-      const input = runTaskInputSchema.parse(request.body);
-      response.status(201).json(await taskService.runTask(input));
+      response.status(201).json(await taskService.runTask(input.data));
     } catch (err) {
-      console.error("[tasks/run] Error:", err);
+      if (err instanceof TaskInputError) {
+        response.status(400).send(err.message);
+        return;
+      }
       next(err);
     }
   });

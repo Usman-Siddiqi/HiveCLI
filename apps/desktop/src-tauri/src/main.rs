@@ -3,6 +3,7 @@
 use serde::Serialize;
 
 #[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RuntimeConfig {
     orchestrator_url: String,
     websocket_url: String,
